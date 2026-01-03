@@ -1,0 +1,117 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #0f0;
+}
+
+#game-container {
+    position: relative;
+    width: 800px;
+    height: 600px;
+}
+
+#game-canvas {
+    display: block;
+    background-color: #000;
+    border: 2px solid #0f0;
+}
+
+#ui-overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    justify-content: space-between;
+    z-index: 10;
+    font-size: 18px;
+    text-shadow: 0 0 10px #0f0;
+}
+
+.hidden {
+    display: none !important;
+}
+
+#pause-overlay,
+#game-over-overlay,
+#start-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.pause-content,
+.game-over-content,
+.start-content {
+    text-align: center;
+    padding: 40px;
+    border: 2px solid #0f0;
+    background-color: rgba(0, 20, 0, 0.9);
+    box-shadow: 0 0 20px #0f0;
+}
+
+.pause-content h2,
+.game-over-content h2,
+.start-content h1 {
+    font-size: 36px;
+    margin-bottom: 20px;
+    text-shadow: 0 0 15px #0f0;
+}
+
+.pause-content p,
+.game-over-content p,
+.start-content p {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.start-content ul {
+    list-style: none;
+    margin: 20px 0;
+    text-align: left;
+    display: inline-block;
+}
+
+.start-content li {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+button {
+    background-color: #000;
+    color: #0f0;
+    border: 2px solid #0f0;
+    padding: 12px 30px;
+    font-size: 18px;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: all 0.3s ease;
+}
+
+button:hover {
+    background-color: #0f0;
+    color: #000;
+    box-shadow: 0 0 15px #0f0;
+}
+
+button:active {
+    transform: scale(0.95);
+}

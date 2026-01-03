@@ -1,0 +1,168 @@
+/**
+ * Renderer
+ * Handles all canvas rendering operations
+ */
+
+window.SpaceInvaders = window.SpaceInvaders || {};
+
+SpaceInvaders.Renderer = class Renderer {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        const CONFIG = SpaceInvaders.CONFIG;
+        this.width = CONFIG.CANVAS.WIDTH;
+        this.height = CONFIG.CANVAS.HEIGHT;
+        
+        // Set canvas size
+        canvas.width = this.width;
+        canvas.height = this.height;
+    }
+    
+    clear() {
+        const CONFIG = SpaceInvaders.CONFIG;
+        this.ctx.fillStyle = CONFIG.CANVAS.BACKGROUND_COLOR;
+        this.ctx.fillRect(0, 0, this.width, this.height);
+    }
+    
+    renderEntity(entity) {
+        if (entity.active) {
+            entity.render(this.ctx);
+        }
+    }
+    
+    renderEntities(entities) {
+        for (const entity of entities) {
+            this.renderEntity(entity);
+        }
+    }
+    
+    renderHUD(gameState) {
+        const ctx = this.ctx;
+        
+        // Score
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '20px "Press Start 2P", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`SCORE: ${gameState.score}`, 20, 30);
+        
+        // High Score
+        ctx.textAlign = 'center';
+        ctx.fillText(`HI-SCORE: ${gameState.highScore}`, this.width / 2, 30);
+        
+        // Lives
+        ctx.textAlign = 'right';
+        ctx.fillText(`LIVES: ${gameState.lives}`, this.width - 20, 30);
+        
+        // Level
+        ctx.textAlign = 'left';
+        ctx.font = '14px "Press Start 2P", monospace';
+        ctx.fillText(`LEVEL ${gameState.level}`, 20, 55);
+    }
+    
+    renderPauseScreen() {
+        const ctx = this.ctx;
+        
+        // Semi-transparent overlay
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, this.width, this.height);
+        
+        // Pause text
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '40px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+        
+        ctx.font = '16px "Press Start 2P", monospace';
+        ctx.fillText('Press P or ESC to continue', this.width / 2, this.height / 2 + 50);
+    }
+    
+    renderGameOver(score, highScore, isNewHighScore) {
+        const ctx = this.ctx;
+        
+        // Semi-transparent overlay
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(0, 0, this.width, this.height);
+        
+        // Game Over text
+        ctx.fillStyle = '#ff0000';
+        ctx.font = '48px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 60);
+        
+        // Score
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '20px "Press Start 2P", monospace';
+        ctx.fillText(`FINAL SCORE: ${score}`, this.width / 2, this.height / 2);
+        
+        if (isNewHighScore) {
+            ctx.fillStyle = '#ffff00';
+            ctx.fillText('NEW HIGH SCORE!', this.width / 2, this.height / 2 + 40);
+        } else {
+            ctx.fillText(`HIGH SCORE: ${highScore}`, this.width / 2, this.height / 2 + 40);
+        }
+        
+        ctx.fillStyle = '#888888';
+        ctx.font = '14px "Press Start 2P", monospace';
+        ctx.fillText('Click to play again', this.width / 2, this.height / 2 + 100);
+    }
+    
+    renderLevelComplete(level) {
+        const ctx = this.ctx;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, this.width, this.height);
+        
+        ctx.fillStyle = '#00ff00';
+        ctx.font = '36px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`LEVEL ${level} COMPLETE!`, this.width / 2, this.height / 2);
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '16px "Press Start 2P", monospace';
+        ctx.fillText('Get ready...', this.width / 2, this.height / 2 + 50);
+    }
+    
+    renderStartScreen(highScore) {
+        const ctx = this.ctx;
+        
+        this.clear();
+        
+        // Simple border
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(40, 40, this.width - 80, this.height - 80);
+        
+        // Title
+        ctx.fillStyle = '#00ff00';
+        ctx.font = '36px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('SPACE INVADERS', this.width / 2, 120);
+        
+        // High Score
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '16px "Press Start 2P", monospace';
+        ctx.fillText(`HIGH SCORE: ${highScore}`, this.width / 2, 170);
+        
+        // Instructions
+        ctx.font = '14px "Press Start 2P", monospace';
+        ctx.fillStyle = '#888888';
+        ctx.fillText('CONTROLS:', this.width / 2, 230);
+        ctx.fillText('A / ← - Move Left', this.width / 2, 270);
+        ctx.fillText('D / → - Move Right', this.width / 2, 300);
+        ctx.fillText('SPACE - Fire', this.width / 2, 330);
+        ctx.fillText('P / ESC - Pause', this.width / 2, 360);
+        
+        // Alien point values
+        ctx.fillStyle = '#ff00ff';
+        ctx.fillText('▼ = 30 PTS', this.width / 2 - 150, 420);
+        ctx.fillStyle = '#00ffff';
+        ctx.fillText('◆ = 20 PTS', this.width / 2, 420);
+        ctx.fillStyle = '#ffff00';
+        ctx.fillText('● = 10 PTS', this.width / 2 + 150, 420);
+        
+        // Start prompt
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '18px "Press Start 2P", monospace';
+        ctx.fillText('PRESS SPACE TO START', this.width / 2, 500);
+    }
+};
