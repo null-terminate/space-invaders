@@ -124,8 +124,11 @@ SpaceInvaders.Game = class Game {
         // Handle different game states
         switch (this.gameState.state) {
             case 'menu':
-                // Start game with spacebar
-                if (this.inputHandler.isFiring()) {
+                // Handle menu delay (prevents immediate start when coming from game over)
+                if (this.menuDelay > 0) {
+                    this.menuDelay -= deltaTime;
+                } else if (this.inputHandler.isFiring()) {
+                    // Start game with spacebar
                     this.startGame();
                 }
                 break;
@@ -143,6 +146,11 @@ SpaceInvaders.Game = class Game {
             case 'gameOver':
                 this.gameState.update(deltaTime);
                 this.updateExplosions(deltaTime);
+                // Return to menu with spacebar
+                if (this.gameState.gameOverTimer <= 0 && this.inputHandler.isFiring()) {
+                    this.gameState.state = 'menu';
+                    this.menuDelay = 0.3; // Delay before menu accepts input
+                }
                 break;
         }
         

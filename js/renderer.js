@@ -39,6 +39,11 @@ SpaceInvaders.Renderer = class Renderer {
     renderHUD(gameState) {
         const ctx = this.ctx;
         
+        // Red border around game area
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(2, 2, this.width - 4, this.height - 4);
+        
         // Score
         ctx.fillStyle = '#ffffff';
         ctx.font = '20px "Press Start 2P", monospace';
@@ -103,7 +108,7 @@ SpaceInvaders.Renderer = class Renderer {
         
         ctx.fillStyle = '#888888';
         ctx.font = '14px "Press Start 2P", monospace';
-        ctx.fillText('Click to play again', this.width / 2, this.height / 2 + 100);
+        ctx.fillText('PRESS SPACE TO CONTINUE', this.width / 2, this.height / 2 + 100);
     }
     
     renderLevelComplete(level) {
