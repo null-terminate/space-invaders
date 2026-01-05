@@ -64,16 +64,16 @@ SpaceInvaders.Player = class Player extends SpaceInvaders.Entity {
     }
     
     update(deltaTime, inputHandler) {
+        // Handle respawn timer
         if (this.respawnTime > 0) {
             this.respawnTime -= deltaTime * 1000;
             if (this.respawnTime <= 0) {
                 this.respawnTime = 0;
                 this.invulnerable = false;
             }
-            return;
         }
         
-        // Movement
+        // Movement (allowed even while invulnerable)
         if (inputHandler.isMovingLeft()) {
             this.x -= this.speed * deltaTime;
         }

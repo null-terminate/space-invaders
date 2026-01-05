@@ -110,7 +110,7 @@ SpaceInvaders.CONFIG = {
     GAME: {
         TARGET_FPS: 60,
         LEVEL_COMPLETE_DELAY: 2000,    // ms before next level
-        GAME_OVER_DELAY: 3000          // ms before returning to menu
+        GAME_OVER_DELAY: 1000          // ms before returning to menu
     },
     
     // Controls
