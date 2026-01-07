@@ -123,7 +123,7 @@ SpaceInvaders.Player = class Player extends SpaceInvaders.Entity {
  * Alien entity
  */
 SpaceInvaders.Alien = class Alien extends SpaceInvaders.Entity {
-    constructor(x, y, type, spriteManager) {
+    constructor(x, y, type, spriteManager, hasShield = false) {
         const config = CONFIG.ALIENS;
         super(x, y, config.WIDTH, config.HEIGHT);
         this.type = type;
@@ -131,6 +131,9 @@ SpaceInvaders.Alien = class Alien extends SpaceInvaders.Entity {
         this.points = CONFIG.ALIEN_POINTS[type];
         this.color = CONFIG.ALIEN_COLORS[type];
         this.animationTimer = 0;
+        this.hasShield = hasShield;
+        this.shieldActive = hasShield;
+        this.shieldGlowTimer = 0;
     }
     
     updateAnimation(deltaTime) {
@@ -141,12 +144,71 @@ SpaceInvaders.Alien = class Alien extends SpaceInvaders.Entity {
                 this.sprite.nextFrame();
             }
         }
+        
+        // Update shield glow animation
+        if (this.shieldActive) {
+            this.shieldGlowTimer += deltaTime * 1000;
+        }
+    }
+    
+    // Method to handle being hit by a bullet
+    hitByBullet() {
+        if (this.shieldActive) {
+            // First hit removes shield
+            this.shieldActive = false;
+            return false; // Alien not destroyed yet
+        } else {
+            // Second hit (or first hit if no shield) destroys alien
+            this.active = false;
+            return true; // Alien destroyed
+        }
     }
     
     render(ctx) {
         if (this.sprite) {
             this.sprite.render(ctx, this.x, this.y, 2, this.color);
         }
+        
+        // Render shield if active
+        if (this.shieldActive) {
+            this.renderShield(ctx);
+        }
+    }
+    
+    renderShield(ctx) {
+        const radius = this.width * 0.5;  // Smaller shield (was 0.7)
+        const glowIntensity = 0.5 + 0.3 * Math.sin(this.shieldGlowTimer * 0.005);
+        
+        ctx.save();
+        
+        // Create bright neon orange glow effect
+        ctx.shadowColor = '#ff8800ff';  // Bright neon orange shadow
+        ctx.shadowBlur = 15 * glowIntensity;
+        
+        // Draw outer glow
+        ctx.strokeStyle = `rgba(255, 180, 50, ${0.3 * glowIntensity})`;  // Light neon orange
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, radius + 2, 0, 2 * Math.PI);
+        ctx.stroke();
+        
+        // Draw main shield circle
+        ctx.shadowBlur = 8 * glowIntensity;
+        ctx.strokeStyle = `rgba(255, 102, 0, ${0.8 * glowIntensity})`;  // Main neon orange
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
+        ctx.stroke();
+        
+        // Draw inner bright circle
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = `rgba(255, 220, 100, ${0.6 * glowIntensity})`;  // Bright electric orange
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, radius - 2, 0, 2 * Math.PI);
+        ctx.stroke();
+        
+        ctx.restore();
     }
 };
 
@@ -298,11 +360,13 @@ SpaceInvaders.UFO = class UFO extends SpaceInvaders.Entity {
  * Explosion effect entity
  */
 SpaceInvaders.Explosion = class Explosion extends SpaceInvaders.Entity {
-    constructor(x, y, spriteManager) {
+    constructor(x, y, spriteManager, alien = null, alienDirection = 1, alienSpeed = 0) {
         super(x, y, 32, 32);
         this.sprite = spriteManager.createSprite('explosion');
         this.duration = 300;
         this.elapsed = 0;
+        this.alienDirection = alienDirection; // Direction for trajectory
+        this.alienSpeed = alienSpeed; // Speed for trajectory
     }
     
     update(deltaTime) {
@@ -315,11 +379,85 @@ SpaceInvaders.Explosion = class Explosion extends SpaceInvaders.Entity {
                 this.sprite.setFrame(frameIndex);
             }
         }
+        
+        // Continue moving along the alien's trajectory independently
+        this.x += this.alienDirection * this.alienSpeed * deltaTime;
     }
     
     render(ctx) {
         if (this.sprite) {
             this.sprite.render(ctx, this.x, this.y, 2);
         }
+    }
+};
+
+/**
+ * Shield explosion effect - creates a "popping" animation
+ */
+SpaceInvaders.ShieldExplosion = class ShieldExplosion extends SpaceInvaders.Entity {
+    constructor(x, y, alien = null) {
+        super(x, y, 50, 50);
+        this.duration = 500; // Longer duration for more visible effect
+        this.elapsed = 0;
+        this.maxRadius = 25; // Smaller maximum expansion radius (half of 50)
+        this.alien = alien; // Reference to the alien to follow
+    }
+    
+    update(deltaTime) {
+        this.elapsed += deltaTime * 1000;
+        if (this.elapsed >= this.duration) {
+            this.active = false;
+        }
+        
+        // Follow the alien's position if it's still active
+        if (this.alien && this.alien.active) {
+            this.x = this.alien.x;
+            this.y = this.alien.y;
+        }
+    }
+    
+    render(ctx) {
+        if (!this.active) return;
+        
+        const progress = this.elapsed / this.duration;
+        const radius = this.maxRadius * progress;
+        const alpha = Math.max(0.2, 1.0 - progress); // Slower fade, minimum 20% opacity
+        
+        ctx.save();
+        
+        // Add glow effect
+        ctx.shadowColor = '#ff6600';
+        ctx.shadowBlur = 10;
+        
+        // Outer expanding ring - brightest
+        ctx.strokeStyle = `rgba(255, 102, 0, ${Math.min(1.0, alpha * 1.5)})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
+        ctx.stroke();
+        
+        // Middle expanding ring
+        ctx.strokeStyle = `rgba(255, 140, 0, ${Math.min(1.0, alpha * 1.2)})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, radius * 0.7, 0, 2 * Math.PI);
+        ctx.stroke();
+        
+        // Inner expanding ring
+        ctx.strokeStyle = `rgba(255, 180, 50, ${Math.min(1.0, alpha * 1.8)})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, radius * 0.4, 0, 2 * Math.PI);
+        ctx.stroke();
+        
+        // Bright center flash (lasts longer)
+        if (progress < 0.6) {
+            ctx.fillStyle = `rgba(255, 220, 100, ${Math.min(1.0, alpha * 2.5)})`;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, Math.max(3, radius * 0.15), 0, 2 * Math.PI);
+            ctx.fill();
+        }
+        
+        ctx.restore();
     }
 };

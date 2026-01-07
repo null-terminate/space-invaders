@@ -64,7 +64,15 @@ SpaceInvaders.Game = class Game {
                 const type = CONFIG.ALIEN_TYPES[row];
                 const x = alienConfig.START_X + col * (alienConfig.WIDTH + alienConfig.PADDING_X);
                 const y = alienConfig.START_Y + row * (alienConfig.HEIGHT + alienConfig.PADDING_Y);
-                this.aliens.push(new SpaceInvaders.Alien(x, y, type, this.spriteManager));
+                
+                // Add shields to some aliens in level 2+
+                let hasShield = false;
+                if (this.gameState.level >= 2) {
+                    // 20% chance for an alien to have a shield in level 2+
+                    hasShield = Math.random() < 0.2;
+                }
+                
+                this.aliens.push(new SpaceInvaders.Alien(x, y, type, this.spriteManager, hasShield));
             }
         }
         
@@ -316,13 +324,22 @@ SpaceInvaders.Game = class Game {
                 
                 if (bullet.collidesWith(alien)) {
                     bullet.active = false;
-                    alien.active = false;
-                    this.gameState.addScore(alien.points);
-                    this.explosions.push(new SpaceInvaders.Explosion(alien.x, alien.y, this.spriteManager));
                     
-                    // Increase speed
-                    const CONFIG = SpaceInvaders.CONFIG;
-                    this.alienSpeed += CONFIG.ALIENS.SPEED_INCREASE;
+                    // Use the new hitByBullet method to handle shields
+                    const alienDestroyed = alien.hitByBullet();
+                    
+                    if (alienDestroyed) {
+                        // Alien was destroyed
+                        this.gameState.addScore(alien.points);
+                        this.explosions.push(new SpaceInvaders.Explosion(alien.x, alien.y, this.spriteManager, alien, this.alienDirection, this.alienSpeed));
+                        
+                        // Increase speed
+                        const CONFIG = SpaceInvaders.CONFIG;
+                        this.alienSpeed += CONFIG.ALIENS.SPEED_INCREASE;
+                    } else {
+                        // Shield was hit, create a shield popping explosion effect that follows the alien
+                        this.explosions.push(new SpaceInvaders.ShieldExplosion(alien.x, alien.y, alien));
+                    }
                     break;
                 }
             }
