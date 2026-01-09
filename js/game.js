@@ -279,16 +279,23 @@ SpaceInvaders.Game = class Game {
         
         if (this.ufo && this.ufo.active) {
             this.ufo.update(deltaTime);
-        } else {
+        } else if (this.ufo && !this.ufo.active) {
+            console.log('ufo: inactive - resetting spawn timer');
             this.ufo = null;
+            this.lastUFOSpawnTime = Date.now();
         }
         
         // Spawn UFO
         const now = Date.now();
         if (!this.ufo && now - this.lastUFOSpawnTime >= CONFIG.UFO.SPAWN_INTERVAL) {
-            this.lastUFOSpawnTime = now;
-            if (Math.random() < CONFIG.UFO.SPAWN_CHANCE) {
+            const chance = Math.random();
+            console.log('ufo: spawn check - chance: ' + chance + ', needed: < ' + CONFIG.UFO.SPAWN_CHANCE);
+            if (chance < CONFIG.UFO.SPAWN_CHANCE) {
+                console.log('ufo: spawned!');
                 this.ufo = new SpaceInvaders.UFO(this.spriteManager);
+            } else {
+                console.log('ufo: spawn failed chance check, resetting timer');
+                this.lastUFOSpawnTime = now; // Reset timer even if spawn failed
             }
         }
     }
@@ -350,6 +357,7 @@ SpaceInvaders.Game = class Game {
                 this.gameState.addScore(this.ufo.points);
                 this.explosions.push(new SpaceInvaders.Explosion(this.ufo.x, this.ufo.y, this.spriteManager));
                 this.ufo.active = false;
+                console.log('ufo: destroyed by bullet');
             }
         }
         

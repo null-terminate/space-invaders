@@ -100,10 +100,10 @@ SpaceInvaders.CONFIG = {
     UFO: {
         WIDTH: 48,
         HEIGHT: 20,
-        SPEED: 150,
-        POINTS: [50, 100, 150, 300],  // random points
-        SPAWN_INTERVAL: 25000,         // ms between potential spawns
-        SPAWN_CHANCE: 0.3              // 30% chance to spawn
+        SPEED: 150,                    // pixels per second 
+        POINTS: [50, 100, 150, 300],   // random points
+        SPAWN_INTERVAL: 5000,          // ms between potential spawns
+        SPAWN_CHANCE: 0.5              // 50% chance to spawn
     },
     
     // Game settings
@@ -137,9 +137,9 @@ SpaceInvaders.SPRITES = {
     player: {
         frames: [
             [
-                '          █          ',
-                '         ███         ',
-                '         ███         ',
+                '           █          ',
+                '          ███         ',
+                '          ███         ',
                 '   █████████████████ ',
                 '  ███████████████████',
                 '  ███████████████████',

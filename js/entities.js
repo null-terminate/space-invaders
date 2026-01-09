@@ -339,6 +339,7 @@ SpaceInvaders.UFO = class UFO extends SpaceInvaders.Entity {
         this.speed = startX < 0 ? config.SPEED : -config.SPEED;
         this.sprite = spriteManager.createSprite('ufo');
         this.points = config.POINTS[Math.floor(Math.random() * config.POINTS.length)];
+        console.log('ufo: spawned at ' + this.x);
     }
     
     update(deltaTime) {
@@ -346,6 +347,7 @@ SpaceInvaders.UFO = class UFO extends SpaceInvaders.Entity {
         if ((this.speed > 0 && this.x > CONFIG.CANVAS.WIDTH + this.width) ||
             (this.speed < 0 && this.x < -this.width)) {
             this.active = false;
+            console.log('ufo: deactivated at ' + this.x);
         }
     }
     
