@@ -13,10 +13,14 @@ SpaceInvaders.InputHandler = class InputHandler {
         this.keys = {};
         this.justPressed = {};
 
-        // Virtual actions driven by on-screen buttons / canvas drags.
+        // Virtual actions driven by on-screen controls.
         // Held actions mirror keys; queued actions mirror justPressed.
         this.actions = { left: false, right: false, fire: false };
         this.queuedActions = { pause: false, fire: false };
+
+        // Analog horizontal axis from the thumbstick, -1 (full left) to 1 (full
+        // right), 0 when centred. Keyboard input is digital, so it reports +/-1.
+        this.moveAxis = 0;
 
         this.setupListeners();
     }
@@ -49,8 +53,16 @@ SpaceInvaders.InputHandler = class InputHandler {
         window.addEventListener('blur', () => {
             this.keys = {};
             this.justPressed = {};
-            this.actions = { left: false, right: false, fire: false };
+            this.releaseAllActions();
         });
+    }
+
+    /**
+     * Set the analog movement axis from the thumbstick.
+     * @param {number} value -1 (full left) to 1 (full right)
+     */
+    setMoveAxis(value) {
+        this.moveAxis = Math.max(-1, Math.min(1, value));
     }
 
     /**
@@ -77,6 +89,7 @@ SpaceInvaders.InputHandler = class InputHandler {
     /** Release every held virtual action (e.g. when a touch is cancelled). */
     releaseAllActions() {
         this.actions = { left: false, right: false, fire: false };
+        this.moveAxis = 0;
     }
 
     isKeyDown(keyCode) {
@@ -93,12 +106,32 @@ SpaceInvaders.InputHandler = class InputHandler {
 
     isMovingLeft() {
         const CONFIG = SpaceInvaders.CONFIG;
-        return this.actions.left || CONFIG.CONTROLS.LEFT.some(key => this.isKeyDown(key));
+        return this.moveAxis < 0 ||
+            this.actions.left ||
+            CONFIG.CONTROLS.LEFT.some(key => this.isKeyDown(key));
     }
 
     isMovingRight() {
         const CONFIG = SpaceInvaders.CONFIG;
-        return this.actions.right || CONFIG.CONTROLS.RIGHT.some(key => this.isKeyDown(key));
+        return this.moveAxis > 0 ||
+            this.actions.right ||
+            CONFIG.CONTROLS.RIGHT.some(key => this.isKeyDown(key));
+    }
+
+    /**
+     * Signed movement amount, -1..1. Analog when the thumbstick is driving,
+     * full-scale otherwise. Preferred over isMovingLeft/Right for movement, as
+     * it carries the stick's magnitude; the booleans remain for anything that
+     * only needs to know a direction is held.
+     * @returns {number}
+     */
+    getMoveAmount() {
+        if (this.moveAxis !== 0) return this.moveAxis;
+
+        let amount = 0;
+        if (this.isMovingLeft()) amount -= 1;
+        if (this.isMovingRight()) amount += 1;
+        return amount;
     }
 
     isFiring() {

@@ -165,6 +165,46 @@ button:active {
     touch-action: none;
 }
 
+/* Analog slider. Sized inline from CONFIG.CONTROLS.TOUCH.STICK; the JS measures
+   the rendered box for its travel range, so the two can never disagree.
+   The track is a pill - movement is horizontal only, so a full circle would
+   imply vertical travel that does not exist. */
+.touch-stick {
+    position: relative;
+    flex: 0 0 auto;
+    border: 2px solid #0f0;
+    /* Half the track height gives semicircular caps at any height */
+    border-radius: 999px;
+    background:
+        /* Centre detent, marking the neutral position */
+        linear-gradient(to right,
+            transparent calc(50% - 1px), rgba(0, 255, 0, 0.3) calc(50% - 1px),
+            rgba(0, 255, 0, 0.3) calc(50% + 1px), transparent calc(50% + 1px)),
+        linear-gradient(to bottom, rgba(0, 40, 0, 0.95), rgba(0, 15, 0, 0.95));
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.touch-stick.active {
+    box-shadow: 0 0 18px rgba(0, 255, 0, 0.6);
+}
+
+.touch-stick-knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    /* transform is driven from JS; it carries the translate that positions the
+       knob, so the -50% centring offsets live there too. */
+    transform: translate(-50%, -50%);
+    border: 2px solid #0f0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #0f0, #041a04 70%);
+    box-shadow: 0 0 12px rgba(0, 255, 0, 0.5);
+    pointer-events: none;
+}
+
 .touch-button {
     /* 64px comfortably exceeds the ~44px minimum touch target */
     min-width: 64px;
@@ -251,20 +291,27 @@ button:active {
         display: contents;
     }
 
+    /* Slider left of the canvas, fire/pause right of it. Sizes are set inline
+       from CONFIG, so the override needs !important; the JS measures the
+       rendered box rather than the config, so travel follows automatically. */
+    .touch-stick {
+        order: 1;
+        /* Narrower track and a shorter height to match the smaller fire button */
+        width: 132px !important;
+        height: 56px !important;
+        margin-left: 8px;
+    }
+
+    .touch-stick-knob {
+        width: 48px !important;
+        height: 48px !important;
+    }
+
     .touch-group {
+        order: 3;
         flex-direction: column;
         justify-content: center;
-        height: 100%;
         padding: 0 8px;
-    }
-
-    /* Movement column left of the canvas, fire/pause column right of it */
-    .touch-group:first-child {
-        order: 1;
-    }
-
-    .touch-group:last-child {
-        order: 3;
     }
 
     .touch-button {

@@ -73,13 +73,10 @@ SpaceInvaders.Player = class Player extends SpaceInvaders.Entity {
             }
         }
         
-        // Movement (allowed even while invulnerable)
-        if (inputHandler.isMovingLeft()) {
-            this.x -= this.speed * deltaTime;
-        }
-        if (inputHandler.isMovingRight()) {
-            this.x += this.speed * deltaTime;
-        }
+        // Movement (allowed even while invulnerable). The signed amount is +/-1
+        // for keys and proportional for the thumbstick, so a partly-pushed stick
+        // gives fine control while a full push matches keyboard top speed.
+        this.x += inputHandler.getMoveAmount() * this.speed * deltaTime;
         
         // Keep within bounds
         const halfWidth = this.width / 2;

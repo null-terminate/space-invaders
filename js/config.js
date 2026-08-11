@@ -173,14 +173,26 @@ SpaceInvaders.CONFIG = {
         RIGHT: ['ArrowRight', 'KeyD'],
         FIRE: ['Space'],
         PAUSE: ['KeyP', 'Escape'],
-        // On-screen buttons for keyboard-less play. They feed the same virtual
-        // left/right/fire/pause signals the keyboard does, so movement speed and
-        // fire rate are identical on touch and desktop.
+        // On-screen joypad for keyboard-less play. Feeds the same virtual signals
+        // the keyboard does, so fire rate and top speed match desktop.
         TOUCH: {
             // 'auto'   - show only on devices with no hover-capable pointer
             // 'always' - force the pad on (useful for testing in a desktop browser)
             // 'never'  - keyboard only
-            SHOW: 'auto'
+            SHOW: 'auto',
+            // Analog slider. The knob travels along a horizontal track; how far
+            // it sits from centre sets how fast the ship moves, so a single thumb
+            // can reverse direction without lifting off. Movement is left/right
+            // only, so the track is a pill rather than a full circle.
+            STICK: {
+                TRACK_WIDTH: 208,      // px length of the track
+                TRACK_HEIGHT: 64,      // px thickness - matches the fire button height
+                KNOB_SIZE: 56,         // px diameter of the draggable knob
+                DEAD_ZONE: 0.12,       // fraction of travel ignored around centre
+                // Below this the ship would crawl; anything past the dead zone
+                // moves at least this fraction of full speed.
+                MIN_OUTPUT: 0.35
+            }
         }
     },
     

@@ -247,7 +247,7 @@ SpaceInvaders.Renderer = class Renderer {
         ctx.fillStyle = '#888888';
         ctx.fillText('CONTROLS:', this.width / 2, 230);
         if (this.touchMode) {
-            ctx.fillText('◀ ▶ - Hold to Move', this.width / 2, 270);
+            ctx.fillText('STICK - Slide to Move', this.width / 2, 270);
             ctx.fillText('FIRE - Hold to Shoot', this.width / 2, 300);
             ctx.fillText('❚❚ - Pause', this.width / 2, 330);
         } else {
