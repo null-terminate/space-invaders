@@ -12,18 +12,38 @@ body {
     min-height: 100vh;
     font-family: 'Courier New', monospace;
     color: #0f0;
+    /* Stop iOS from bouncing/zooming the page while a thumb is on a button */
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
 }
 
 #game-container {
     position: relative;
-    width: 800px;
-    height: 600px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* Cap by width and by height so the canvas fits any viewport while keeping
+       its 4:3 shape. The canvas backing store stays 800x600 - CSS only scales
+       what is painted, so all game coordinates are unchanged. */
+    width: min(800px, 100vw);
+    max-height: 100vh;
 }
 
-#game-canvas {
+/* Note: the original rule here targeted #game-canvas, which never matched the
+   element's id (gameCanvas), so the canvas was previously unstyled. */
+#gameCanvas {
     display: block;
     background-color: #000;
-    border: 2px solid #0f0;
+    /* Scale to the container while holding the 800x600 shape. The backing store
+       stays 800x600 - CSS only scales what is painted, so every game coordinate
+       and collision box is unchanged. */
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    /* Preserve the chunky pixel look when scaled */
+    image-rendering: pixelated;
+    /* The canvas is a control surface: no double-tap zoom or scroll-drag */
+    touch-action: none;
 }
 
 #ui-overlay {
@@ -114,4 +134,149 @@ button:hover {
 
 button:active {
     transform: scale(0.95);
+}
+
+/* ---------------------------------------------------------------------------
+   Touch controls
+   Only present in the DOM when TouchControls decides the device needs them
+   (see CONFIG.CONTROLS.TOUCH.SHOW), so desktop layout is untouched.
+   --------------------------------------------------------------------------- */
+
+#touch-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    gap: 12px;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    /* Keep the pad clear of the canvas without pushing it off short screens */
+    flex: 0 0 auto;
+    /* Stop the browser treating pad drags as page gestures */
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.touch-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    touch-action: none;
+}
+
+.touch-button {
+    /* 64px comfortably exceeds the ~44px minimum touch target */
+    min-width: 64px;
+    height: 64px;
+    margin-top: 0;
+    padding: 0 18px;
+    font-size: 22px;
+    line-height: 1;
+    border-radius: 8px;
+    background-color: rgba(0, 20, 0, 0.9);
+    /* A finger already on the button should not leave a lingering hover state */
+    transition: none;
+    /* Repeated on the button because the landscape layout makes #touch-controls
+       `display: contents`, which stops its own touch-action from applying */
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+/* Hover styling is meaningless on touch and leaves buttons stuck lit */
+.touch-button:hover {
+    background-color: rgba(0, 20, 0, 0.9);
+    color: #0f0;
+    box-shadow: none;
+}
+
+.touch-button.pressed {
+    background-color: #0f0;
+    color: #000;
+    box-shadow: 0 0 15px #0f0;
+}
+
+.touch-fire {
+    min-width: 104px;
+    font-size: 18px;
+    letter-spacing: 2px;
+    border-color: #ff4444;
+    color: #ff4444;
+}
+
+.touch-fire.pressed {
+    background-color: #ff4444;
+    color: #000;
+    box-shadow: 0 0 15px #ff4444;
+}
+
+.touch-pause {
+    min-width: 52px;
+    height: 52px;
+    font-size: 16px;
+    opacity: 0.7;
+}
+
+/* Landscape phones have very little vertical room, so the pad flanks the canvas
+   instead of stealing height from it: movement column on the left, fire on the
+   right, canvas between them - one thumb per side. */
+@media (orientation: landscape) and (max-height: 500px) {
+    #game-container {
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        width: 100vw;
+        height: 100vh;
+        padding-right: env(safe-area-inset-right);
+        padding-left: env(safe-area-inset-left);
+    }
+
+    #gameCanvas {
+        /* Fill the height, but never crowd out the pad: max-width lets the
+           aspect-ratio shrink the canvas instead when the viewport is narrow. */
+        width: auto;
+        height: 100%;
+        max-height: 100vh;
+        max-width: 100%;
+        min-width: 0;
+        /* Sit between the two control columns */
+        order: 2;
+    }
+
+    /* Contents are hoisted to either side of the canvas via `display: contents`,
+       so the pad element itself no longer forms a box. */
+    #touch-controls {
+        display: contents;
+    }
+
+    .touch-group {
+        flex-direction: column;
+        justify-content: center;
+        height: 100%;
+        padding: 0 8px;
+    }
+
+    /* Movement column left of the canvas, fire/pause column right of it */
+    .touch-group:first-child {
+        order: 1;
+    }
+
+    .touch-group:last-child {
+        order: 3;
+    }
+
+    .touch-button {
+        min-width: 56px;
+        height: 56px;
+        font-size: 18px;
+    }
+
+    .touch-fire {
+        min-width: 56px;
+        padding: 0 8px;
+        font-size: 12px;
+        letter-spacing: 0;
+    }
 }

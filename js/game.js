@@ -12,6 +12,15 @@ SpaceInvaders.Game = class Game {
         this.renderer = new SpaceInvaders.Renderer(canvas);
         this.inputHandler = new SpaceInvaders.InputHandler();
         this.gameState = new SpaceInvaders.GameState();
+
+        // On-screen pad for keyboard-less devices. Adds nothing to the DOM when
+        // the device has a keyboard, so desktop play is unaffected.
+        this.touchControls = new SpaceInvaders.TouchControls(
+            canvas.parentElement || document.body,
+            this.inputHandler
+        );
+        // Prompts read "TAP" instead of "PRESS SPACE" once the pad is showing
+        this.renderer.touchMode = this.touchControls.enabled;
         
         this.player = null;
         this.aliens = [];
@@ -29,16 +38,33 @@ SpaceInvaders.Game = class Game {
         
         this.lastTime = 0;
         this.running = false;
+        this.menuDelay = 0;
         
         this.setupEventListeners();
     }
     
     setupEventListeners() {
-        this.canvas.addEventListener('click', () => {
+        // pointerdown rather than click: it covers mouse and touch in one path
+        // and fires immediately, without the tap-to-click delay some mobile
+        // browsers add.
+        this.canvas.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
             if (this.gameState.state === 'menu') {
+                if (this.menuDelay > 0) return;
                 this.startGame();
             } else if (this.gameState.state === 'gameOver' && this.gameState.gameOverTimer <= 0) {
                 this.gameState.state = 'menu';
+                this.menuDelay = 0.3;
+            }
+        });
+
+        // Auto-pause when the page is hidden. On mobile, switching apps or
+        // locking the screen would otherwise leave the player parked in front of
+        // live alien fire.
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && this.gameState.state === 'playing') {
+                this.gameState.togglePause();
+                this.inputHandler.releaseAllActions();
             }
         });
     }
@@ -121,10 +147,15 @@ SpaceInvaders.Game = class Game {
     
     gameLoop(currentTime = performance.now()) {
         if (!this.running) return;
-        
-        const deltaTime = (currentTime - this.lastTime) / 1000;
+
+        // Clamp the step. Backgrounding the tab (a phone call, app switch, screen
+        // lock) stalls requestAnimationFrame, and the first frame back would
+        // otherwise carry a multi-second delta - enough to move bullets straight
+        // through aliens without ever overlapping them.
+        const rawDelta = (currentTime - this.lastTime) / 1000;
+        const deltaTime = Math.min(rawDelta, 1 / 30);
         this.lastTime = currentTime;
-        
+
         this.update(deltaTime);
         this.render();
         

@@ -172,7 +172,16 @@ SpaceInvaders.CONFIG = {
         LEFT: ['ArrowLeft', 'KeyA'],
         RIGHT: ['ArrowRight', 'KeyD'],
         FIRE: ['Space'],
-        PAUSE: ['KeyP', 'Escape']
+        PAUSE: ['KeyP', 'Escape'],
+        // On-screen buttons for keyboard-less play. They feed the same virtual
+        // left/right/fire/pause signals the keyboard does, so movement speed and
+        // fire rate are identical on touch and desktop.
+        TOUCH: {
+            // 'auto'   - show only on devices with no hover-capable pointer
+            // 'always' - force the pad on (useful for testing in a desktop browser)
+            // 'never'  - keyboard only
+            SHOW: 'auto'
+        }
     },
     
     // Local storage keys

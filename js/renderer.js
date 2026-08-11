@@ -12,7 +12,11 @@ SpaceInvaders.Renderer = class Renderer {
         const CONFIG = SpaceInvaders.CONFIG;
         this.width = CONFIG.CANVAS.WIDTH;
         this.height = CONFIG.CANVAS.HEIGHT;
-        
+
+        // Set by Game when the on-screen pad is active, so prompts name the
+        // controls the player actually has in front of them.
+        this.touchMode = false;
+
         // Set canvas size
         canvas.width = this.width;
         canvas.height = this.height;
@@ -155,7 +159,11 @@ SpaceInvaders.Renderer = class Renderer {
         ctx.fillText('PAUSED', this.width / 2, this.height / 2);
         
         ctx.font = '16px "Press Start 2P", monospace';
-        ctx.fillText('Press P or ESC to continue', this.width / 2, this.height / 2 + 50);
+        ctx.fillText(
+            this.touchMode ? 'Tap ❚❚ to continue' : 'Press P or ESC to continue',
+            this.width / 2,
+            this.height / 2 + 50
+        );
     }
     
     renderGameOver(score, highScore, isNewHighScore) {
@@ -185,7 +193,11 @@ SpaceInvaders.Renderer = class Renderer {
         
         ctx.fillStyle = '#888888';
         ctx.font = '14px "Press Start 2P", monospace';
-        ctx.fillText('PRESS SPACE TO CONTINUE', this.width / 2, this.height / 2 + 100);
+        ctx.fillText(
+            this.touchMode ? 'TAP TO CONTINUE' : 'PRESS SPACE TO CONTINUE',
+            this.width / 2,
+            this.height / 2 + 100
+        );
     }
     
     renderLevelComplete(level, bossNext = false) {
@@ -234,10 +246,16 @@ SpaceInvaders.Renderer = class Renderer {
         ctx.font = '14px "Press Start 2P", monospace';
         ctx.fillStyle = '#888888';
         ctx.fillText('CONTROLS:', this.width / 2, 230);
-        ctx.fillText('A / ← - Move Left', this.width / 2, 270);
-        ctx.fillText('D / → - Move Right', this.width / 2, 300);
-        ctx.fillText('SPACE - Fire', this.width / 2, 330);
-        ctx.fillText('P / ESC - Pause', this.width / 2, 360);
+        if (this.touchMode) {
+            ctx.fillText('◀ ▶ - Hold to Move', this.width / 2, 270);
+            ctx.fillText('FIRE - Hold to Shoot', this.width / 2, 300);
+            ctx.fillText('❚❚ - Pause', this.width / 2, 330);
+        } else {
+            ctx.fillText('A / ← - Move Left', this.width / 2, 270);
+            ctx.fillText('D / → - Move Right', this.width / 2, 300);
+            ctx.fillText('SPACE - Fire', this.width / 2, 330);
+            ctx.fillText('P / ESC - Pause', this.width / 2, 360);
+        }
         
         // Alien point values
         ctx.fillStyle = '#ff00ff';
@@ -258,6 +276,10 @@ SpaceInvaders.Renderer = class Renderer {
         // Start prompt
         ctx.fillStyle = '#ffffff';
         ctx.font = '18px "Press Start 2P", monospace';
-        ctx.fillText('PRESS SPACE TO START', this.width / 2, 500);
+        ctx.fillText(
+            this.touchMode ? 'TAP TO START' : 'PRESS SPACE TO START',
+            this.width / 2,
+            500
+        );
     }
 };
