@@ -92,30 +92,53 @@ SpaceInvaders.Renderer = class Renderer {
         const barHeight = 14;
         const barX = (this.width - barWidth) / 2;
         const barY = 70;
-        const fraction = boss.healthFraction;
+
+        // While the energy shield holds, the bar reports shield HP instead of boss
+        // health - that is what the player's shots are actually depleting.
+        const showingShield = boss.shieldActive;
+        const fraction = showingShield ? boss.shieldFraction : boss.healthFraction;
+        const label = showingShield ? 'BOSS  SHIELD' : `BOSS  PHASE ${boss.phase}`;
+        const readout = showingShield
+            ? `${boss.shield}/${boss.maxShield}`
+            : `${boss.health}/${boss.maxHealth}`;
+
+        const phaseColors = CONFIG.BOSS.PHASE_COLORS;
+        const fillColor = showingShield
+            ? CONFIG.BOSS.SHIELD.BAR_COLOR
+            : phaseColors[Math.min(boss.phase, phaseColors.length) - 1];
 
         // Label
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = showingShield ? CONFIG.BOSS.SHIELD.BAR_COLOR : '#ffffff';
         ctx.font = '12px "Press Start 2P", monospace';
         ctx.textAlign = 'left';
-        ctx.fillText(`BOSS  PHASE ${boss.phase}`, barX, barY - 8);
+        ctx.fillText(label, barX, barY - 8);
 
         ctx.textAlign = 'right';
-        ctx.fillText(`${boss.health}/${boss.maxHealth}`, barX + barWidth, barY - 8);
+        ctx.fillText(readout, barX + barWidth, barY - 8);
 
         // Track
         ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
         ctx.fillRect(barX, barY, barWidth, barHeight);
 
-        // Fill, coloured by phase
-        const phaseColors = CONFIG.BOSS.PHASE_COLORS;
-        ctx.fillStyle = phaseColors[Math.min(boss.phase, phaseColors.length) - 1];
+        // Fill
+        ctx.fillStyle = fillColor;
         ctx.fillRect(barX, barY, barWidth * fraction, barHeight);
 
         // Outline
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2;
         ctx.strokeRect(barX, barY, barWidth, barHeight);
+
+        // While shielded, a thin dim strip shows the untouched boss health beneath,
+        // so it is clear the shield is a layer on top rather than the whole fight.
+        if (showingShield) {
+            const stripY = barY + barHeight + 4;
+            const stripHeight = 4;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.fillRect(barX, stripY, barWidth, stripHeight);
+            ctx.fillStyle = 'rgba(255, 68, 68, 0.55)';
+            ctx.fillRect(barX, stripY, barWidth * boss.healthFraction, stripHeight);
+        }
     }
 
     renderPauseScreen() {

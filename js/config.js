@@ -146,6 +146,17 @@ SpaceInvaders.CONFIG = {
             WIDTH: 6,
             HEIGHT: 14,
             COLOR: '#ff66ff'
+        },
+        // Energy shield carried by the 2nd boss onwards. Must be stripped before
+        // the boss itself takes damage; its hit points are a fraction of the
+        // boss's own max health, so it scales with each appearance.
+        SHIELD: {
+            FIRST_APPEARANCE: 2,       // earliest boss appearance that carries a shield
+            HEALTH_FRACTION: 0.25,     // shield HP as a fraction of boss max health
+            COLOR: '#66ccff',
+            BAR_COLOR: '#66ccff',
+            PULSE_SPEED: 0.004,        // shimmer rate (radians per ms)
+            BREAK_FLASH_DURATION: 400  // ms of flash when the shield shatters
         }
     },
 

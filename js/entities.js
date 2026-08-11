@@ -433,10 +433,29 @@ SpaceInvaders.Boss = class Boss extends SpaceInvaders.Entity {
         this.attackIndex = 0;
         this.attackTimer = config.ATTACKS.SPREAD.COOLDOWN * 0.5; // brief grace after entrance
         this.pendingShots = [];
+
+        // Energy shield: absorbs hits before the boss takes any damage.
+        // Second appearance onwards; scales with the boss's own health.
+        const shieldConfig = config.SHIELD;
+        this.maxShield = appearance >= shieldConfig.FIRST_APPEARANCE
+            ? Math.max(1, Math.round(this.maxHealth * shieldConfig.HEALTH_FRACTION))
+            : 0;
+        this.shield = this.maxShield;
+        this.shieldPulseTimer = 0;
+        this.shieldBreakTimer = 0;
     }
 
     get healthFraction() {
         return Math.max(0, this.health / this.maxHealth);
+    }
+
+    /** True while the energy shield still has hit points. */
+    get shieldActive() {
+        return this.shield > 0;
+    }
+
+    get shieldFraction() {
+        return this.maxShield > 0 ? Math.max(0, this.shield / this.maxShield) : 0;
     }
 
     /** Whether player bullets can currently damage the boss. */
@@ -465,6 +484,12 @@ SpaceInvaders.Boss = class Boss extends SpaceInvaders.Entity {
         }
         if (this.hitFlashTimer > 0) {
             this.hitFlashTimer -= deltaTime * 1000;
+        }
+
+        // Shield shimmer and shatter flash
+        this.shieldPulseTimer += deltaTime * 1000;
+        if (this.shieldBreakTimer > 0) {
+            this.shieldBreakTimer -= deltaTime * 1000;
         }
 
         switch (this.state) {
@@ -642,14 +667,26 @@ SpaceInvaders.Boss = class Boss extends SpaceInvaders.Entity {
     }
 
     /**
-     * Apply one bullet of damage.
+     * Apply one bullet of damage. The energy shield soaks hits first; only once
+     * it is down does the boss's own health start dropping.
      * @returns {boolean} true if this hit killed the boss
      */
     hitByBullet() {
         if (!this.vulnerable) return false;
 
-        this.health--;
         this.hitFlashTimer = CONFIG.BOSS.HIT_FLASH_DURATION;
+
+        // Shield absorbs the hit; boss health and phase are untouched
+        if (this.shieldActive) {
+            this.shield--;
+            if (this.shield <= 0) {
+                this.shield = 0;
+                this.shieldBreakTimer = CONFIG.BOSS.SHIELD.BREAK_FLASH_DURATION;
+            }
+            return false;
+        }
+
+        this.health--;
 
         // Escalate phase as health drops
         const fraction = this.healthFraction;
@@ -695,6 +732,73 @@ SpaceInvaders.Boss = class Boss extends SpaceInvaders.Entity {
         ctx.shadowColor = this.color;
         ctx.shadowBlur = this.phase >= 3 ? 18 : 10;
         this.sprite.render(ctx, this.x, this.y, config.SPRITE_SCALE, color);
+        ctx.restore();
+
+        // Shield bubble sits on top of the hull
+        if (this.shieldActive) {
+            this.renderShield(ctx);
+        } else if (this.shieldBreakTimer > 0) {
+            this.renderShieldBreak(ctx);
+        }
+    }
+
+    /**
+     * Elliptical energy bubble hugging the boss hull. Opacity tracks remaining
+     * shield HP so the player can read how close it is to breaking.
+     */
+    renderShield(ctx) {
+        const shieldConfig = CONFIG.BOSS.SHIELD;
+        const rx = this.width * 0.62;
+        const ry = this.height * 0.95;
+        const pulse = 0.75 + 0.25 * Math.sin(this.shieldPulseTimer * shieldConfig.PULSE_SPEED);
+        // Fade the bubble as it weakens, but keep it clearly visible
+        const strength = 0.35 + 0.65 * this.shieldFraction;
+        const alpha = pulse * strength;
+
+        ctx.save();
+        ctx.shadowColor = shieldConfig.COLOR;
+        ctx.shadowBlur = 12 * pulse;
+
+        // Outer ring
+        ctx.strokeStyle = `rgba(102, 204, 255, ${(0.85 * alpha).toFixed(3)})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, rx, ry, 0, 0, 2 * Math.PI);
+        ctx.stroke();
+
+        // Inner ring
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = `rgba(180, 235, 255, ${(0.55 * alpha).toFixed(3)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, rx - 5, ry - 4, 0, 0, 2 * Math.PI);
+        ctx.stroke();
+
+        // Faint fill so the bubble reads as a surface, not just an outline
+        ctx.fillStyle = `rgba(102, 204, 255, ${(0.10 * alpha).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, rx, ry, 0, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    /** Expanding shockwave the moment the shield shatters. */
+    renderShieldBreak(ctx) {
+        const shieldConfig = CONFIG.BOSS.SHIELD;
+        const progress = 1 - this.shieldBreakTimer / shieldConfig.BREAK_FLASH_DURATION;
+        const alpha = Math.max(0, 1 - progress);
+        const rx = this.width * (0.62 + 0.5 * progress);
+        const ry = this.height * (0.95 + 0.6 * progress);
+
+        ctx.save();
+        ctx.shadowColor = shieldConfig.COLOR;
+        ctx.shadowBlur = 20 * alpha;
+        ctx.strokeStyle = `rgba(180, 235, 255, ${alpha.toFixed(3)})`;
+        ctx.lineWidth = 4 * alpha + 1;
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, rx, ry, 0, 0, 2 * Math.PI);
+        ctx.stroke();
         ctx.restore();
     }
 };
