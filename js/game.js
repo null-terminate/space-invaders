@@ -35,11 +35,16 @@ SpaceInvaders.Game = class Game {
         this.alienSpeed = SpaceInvaders.CONFIG.ALIENS.BASE_SPEED;
         this.lastAlienFireTime = 0;
         this.lastUFOSpawnTime = 0;
-        
+        this.isBossLevel = false;
+
         this.lastTime = 0;
         this.running = false;
         this.menuDelay = 0;
-        
+        // Swallows the keypress that started the game, so the ship does not fire
+        // the instant the player taps SPACE at the menu.
+        this.startupDelay = 0;
+
+
         this.setupEventListeners();
     }
     
@@ -58,15 +63,26 @@ SpaceInvaders.Game = class Game {
             }
         });
 
-        // Auto-pause when the page is hidden. On mobile, switching apps or
-        // locking the screen would otherwise leave the player parked in front of
-        // live alien fire.
+        // Auto-pause when the player's attention leaves the game. On mobile,
+        // switching apps or locking the screen would otherwise leave the player
+        // parked in front of live alien fire; on desktop, so would clicking away
+        // to another window. visibilitychange covers the former, blur the latter -
+        // a focus change does not always hide the page.
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden && this.gameState.state === 'playing') {
-                this.gameState.togglePause();
-                this.inputHandler.releaseAllActions();
-            }
+            if (document.hidden) this.pauseForInterruption();
         });
+        window.addEventListener('blur', () => this.pauseForInterruption());
+    }
+
+    /**
+     * Pause because the game lost the player's attention, dropping any held
+     * inputs so the ship is not still drifting or firing on return.
+     */
+    pauseForInterruption() {
+        if (this.gameState.state === 'playing') {
+            this.gameState.pauseGame();
+        }
+        this.inputHandler.releaseAllActions();
     }
     
     startGame() {
@@ -186,12 +202,13 @@ SpaceInvaders.Game = class Game {
                 break;
             case 'paused':
                 break;
-            case 'levelComplete':
+            case 'levelComplete': {
                 const result = this.gameState.update(deltaTime);
                 if (result === 'nextLevel') {
                     this.initLevel();
                 }
                 break;
+            }
             case 'gameOver':
                 this.gameState.update(deltaTime);
                 this.updateExplosions(deltaTime);
@@ -359,23 +376,19 @@ SpaceInvaders.Game = class Game {
         
         if (this.ufo && this.ufo.active) {
             this.ufo.update(deltaTime);
-        } else if (this.ufo && !this.ufo.active) {
-            console.log('ufo: inactive - resetting spawn timer');
+        } else if (this.ufo) {
+            // Flew off screen or was shot down - start the cooldown again
             this.ufo = null;
             this.lastUFOSpawnTime = Date.now();
         }
-        
-        // Spawn UFO
+
+        // Spawn UFO. The interval is rolled whether or not the chance lands, so a
+        // failed roll waits a full interval before trying again.
         const now = Date.now();
         if (!this.ufo && now - this.lastUFOSpawnTime >= CONFIG.UFO.SPAWN_INTERVAL) {
-            const chance = Math.random();
-            console.log('ufo: spawn check - chance: ' + chance + ', needed: < ' + CONFIG.UFO.SPAWN_CHANCE);
-            if (chance < CONFIG.UFO.SPAWN_CHANCE) {
-                console.log('ufo: spawned!');
+            this.lastUFOSpawnTime = now;
+            if (Math.random() < CONFIG.UFO.SPAWN_CHANCE) {
                 this.ufo = new SpaceInvaders.UFO(this.spriteManager);
-            } else {
-                console.log('ufo: spawn failed chance check, resetting timer');
-                this.lastUFOSpawnTime = now; // Reset timer even if spawn failed
             }
         }
     }
@@ -418,7 +431,12 @@ SpaceInvaders.Game = class Game {
                     if (alienDestroyed) {
                         // Alien was destroyed
                         this.gameState.addScore(alien.points);
-                        this.explosions.push(new SpaceInvaders.Explosion(alien.x, alien.y, this.spriteManager, alien, this.alienDirection, this.alienSpeed));
+                        this.explosions.push(new SpaceInvaders.Explosion(
+                            alien.x,
+                            alien.y,
+                            this.spriteManager,
+                            this.alienDirection * this.alienSpeed
+                        ));
                         
                         // Increase speed
                         const CONFIG = SpaceInvaders.CONFIG;
@@ -451,12 +469,13 @@ SpaceInvaders.Game = class Game {
                 this.gameState.addScore(this.ufo.points);
                 this.explosions.push(new SpaceInvaders.Explosion(this.ufo.x, this.ufo.y, this.spriteManager));
                 this.ufo.active = false;
-                console.log('ufo: destroyed by bullet');
             }
         }
         
-        // Bullets vs shields
+        // Bullets vs shields. Skip flattened shields - aliens overrunning a shield
+        // clear its active flag, and an invisible shield must not keep eating shots.
         for (const shield of this.shields) {
+            if (!shield.active) continue;
             for (const bullet of [...this.playerBullets, ...this.alienBullets]) {
                 if (bullet.active && shield.checkCollision(bullet)) {
                     bullet.active = false;

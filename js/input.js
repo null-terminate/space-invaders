@@ -104,41 +104,42 @@ SpaceInvaders.InputHandler = class InputHandler {
         return false;
     }
 
-    isMovingLeft() {
-        const CONFIG = SpaceInvaders.CONFIG;
-        return this.moveAxis < 0 ||
-            this.actions.left ||
-            CONFIG.CONTROLS.LEFT.some(key => this.isKeyDown(key));
-    }
-
-    isMovingRight() {
-        const CONFIG = SpaceInvaders.CONFIG;
-        return this.moveAxis > 0 ||
-            this.actions.right ||
-            CONFIG.CONTROLS.RIGHT.some(key => this.isKeyDown(key));
-    }
-
     /**
-     * Signed movement amount, -1..1. Analog when the thumbstick is driving,
-     * full-scale otherwise. Preferred over isMovingLeft/Right for movement, as
-     * it carries the stick's magnitude; the booleans remain for anything that
-     * only needs to know a direction is held.
+     * Signed movement amount, -1..1. Analog when the thumbstick is driving it,
+     * full-scale for keys and on-screen direction buttons. Opposing inputs
+     * cancel, so holding both directions parks the ship.
      * @returns {number}
      */
     getMoveAmount() {
         if (this.moveAxis !== 0) return this.moveAxis;
 
+        const CONFIG = SpaceInvaders.CONFIG;
         let amount = 0;
-        if (this.isMovingLeft()) amount -= 1;
-        if (this.isMovingRight()) amount += 1;
+        if (this.actions.left || CONFIG.CONTROLS.LEFT.some(key => this.isKeyDown(key))) {
+            amount -= 1;
+        }
+        if (this.actions.right || CONFIG.CONTROLS.RIGHT.some(key => this.isKeyDown(key))) {
+            amount += 1;
+        }
         return amount;
     }
 
+    /**
+     * Whether fire is being requested this frame.
+     *
+     * justPressed is consulted alongside the held state because a tap short
+     * enough to start and end between two frames has already released by the
+     * time the loop polls, and held-state alone would drop it - most visible on
+     * the menu and game-over screens, where a quick tap did nothing. It is
+     * peeked rather than consumed, and clearJustPressed wipes it once per frame,
+     * so a single tap still fires exactly once.
+     * @returns {boolean}
+     */
     isFiring() {
         const CONFIG = SpaceInvaders.CONFIG;
         return this.actions.fire ||
             this.queuedActions.fire ||
-            CONFIG.CONTROLS.FIRE.some(key => this.isKeyDown(key));
+            CONFIG.CONTROLS.FIRE.some(key => this.isKeyDown(key) || this.justPressed[key] === true);
     }
 
     isPausePressed() {

@@ -36,11 +36,6 @@ SpaceInvaders.GameState = class GameState {
         }
     }
     
-    loseLife() {
-        this.lives--;
-        return this.lives <= 0;
-    }
-    
     setLives(lives) {
         this.lives = lives;
     }

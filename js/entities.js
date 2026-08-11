@@ -336,15 +336,13 @@ SpaceInvaders.UFO = class UFO extends SpaceInvaders.Entity {
         this.speed = startX < 0 ? config.SPEED : -config.SPEED;
         this.sprite = spriteManager.createSprite('ufo');
         this.points = config.POINTS[Math.floor(Math.random() * config.POINTS.length)];
-        console.log('ufo: spawned at ' + this.x);
     }
-    
+
     update(deltaTime) {
         this.x += this.speed * deltaTime;
         if ((this.speed > 0 && this.x > CONFIG.CANVAS.WIDTH + this.width) ||
             (this.speed < 0 && this.x < -this.width)) {
             this.active = false;
-            console.log('ufo: deactivated at ' + this.x);
         }
     }
     
@@ -804,15 +802,22 @@ SpaceInvaders.Boss = class Boss extends SpaceInvaders.Entity {
  * Explosion effect entity
  */
 SpaceInvaders.Explosion = class Explosion extends SpaceInvaders.Entity {
-    constructor(x, y, spriteManager, alien = null, alienDirection = 1, alienSpeed = 0) {
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @param {SpaceInvaders.SpriteManager} spriteManager
+     * @param {number} [driftX] signed horizontal velocity in px/s. Explosions born
+     *   from a marching alien inherit its drift so the puff keeps pace with the
+     *   rank it came from instead of hanging in place.
+     */
+    constructor(x, y, spriteManager, driftX = 0) {
         super(x, y, 32, 32);
         this.sprite = spriteManager.createSprite('explosion');
         this.duration = 300;
         this.elapsed = 0;
-        this.alienDirection = alienDirection; // Direction for trajectory
-        this.alienSpeed = alienSpeed; // Speed for trajectory
+        this.driftX = driftX;
     }
-    
+
     update(deltaTime) {
         this.elapsed += deltaTime * 1000;
         if (this.elapsed >= this.duration) {
@@ -823,9 +828,8 @@ SpaceInvaders.Explosion = class Explosion extends SpaceInvaders.Entity {
                 this.sprite.setFrame(frameIndex);
             }
         }
-        
-        // Continue moving along the alien's trajectory independently
-        this.x += this.alienDirection * this.alienSpeed * deltaTime;
+
+        this.x += this.driftX * deltaTime;
     }
     
     render(ctx) {
