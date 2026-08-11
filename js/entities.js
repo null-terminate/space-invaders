@@ -61,8 +61,14 @@ SpaceInvaders.Player = class Player extends SpaceInvaders.Entity {
         this.lives = config.START_LIVES;
         this.respawnTime = 0;
         this.invulnerable = false;
+
+        // Active power-up, or null. rapidFireTime counts down in ms; the fire
+        // rate and bullet allowance are derived from it rather than stored, so
+        // the effect cannot get stuck on if the timer is reset from elsewhere.
+        this.powerUp = null;
+        this.powerUpTime = 0;
     }
-    
+
     update(deltaTime, inputHandler) {
         // Handle respawn timer
         if (this.respawnTime > 0) {
@@ -72,7 +78,16 @@ SpaceInvaders.Player = class Player extends SpaceInvaders.Entity {
                 this.invulnerable = false;
             }
         }
-        
+
+        // Expire the active power-up
+        if (this.powerUpTime > 0) {
+            this.powerUpTime -= deltaTime * 1000;
+            if (this.powerUpTime <= 0) {
+                this.powerUpTime = 0;
+                this.powerUp = null;
+            }
+        }
+
         // Movement (allowed even while invulnerable). The signed amount is +/-1
         // for keys and proportional for the thumbstick, so a partly-pushed stick
         // gives fine control while a full push matches keyboard top speed.
@@ -83,10 +98,46 @@ SpaceInvaders.Player = class Player extends SpaceInvaders.Entity {
         this.x = Math.max(halfWidth, Math.min(CONFIG.CANVAS.WIDTH - halfWidth, this.x));
     }
     
-    canFire() {
-        return Date.now() - this.lastFireTime >= this.fireRate && this.respawnTime <= 0;
+    /**
+     * Collect a capsule, starting or refreshing its effect.
+     * @param {'rapidFire'} type
+     */
+    applyPowerUp(type) {
+        if (type === 'rapidFire') {
+            this.powerUp = 'rapidFire';
+            // Re-collecting restarts the clock rather than stacking, so the
+            // effect can be extended but never banked indefinitely.
+            this.powerUpTime = CONFIG.POWERUPS.RAPID_FIRE.DURATION;
+        }
     }
-    
+
+    /** Drop any active power-up (on death, or when a level ends). */
+    clearPowerUp() {
+        this.powerUp = null;
+        this.powerUpTime = 0;
+    }
+
+    /** Current minimum ms between shots, shortened while rapid fire is active. */
+    getFireRate() {
+        return this.powerUp === 'rapidFire'
+            ? CONFIG.POWERUPS.RAPID_FIRE.FIRE_RATE
+            : this.fireRate;
+    }
+
+    /** How many of the player's bullets may be on screen at once. */
+    getMaxBullets(bossLevelAllowance) {
+        if (this.powerUp === 'rapidFire') {
+            // Take whichever allowance is larger, so collecting the capsule on a
+            // boss level is never a downgrade from the boss's own allowance.
+            return Math.max(CONFIG.POWERUPS.RAPID_FIRE.MAX_ACTIVE, bossLevelAllowance);
+        }
+        return bossLevelAllowance;
+    }
+
+    canFire() {
+        return Date.now() - this.lastFireTime >= this.getFireRate() && this.respawnTime <= 0;
+    }
+
     fire() {
         this.lastFireTime = Date.now();
         return new SpaceInvaders.Bullet(
@@ -98,6 +149,9 @@ SpaceInvaders.Player = class Player extends SpaceInvaders.Entity {
     
     hit() {
         this.lives--;
+        // Getting hit costs the power-up, so it is something to protect rather
+        // than something a respawn hands back
+        this.clearPowerUp();
         if (this.lives > 0) {
             this.respawnTime = CONFIG.PLAYER.RESPAWN_DELAY;
             this.invulnerable = true;
@@ -794,6 +848,58 @@ SpaceInvaders.Boss = class Boss extends SpaceInvaders.Entity {
         ctx.beginPath();
         ctx.ellipse(this.x, this.y, rx, ry, 0, 0, 2 * Math.PI);
         ctx.stroke();
+        ctx.restore();
+    }
+};
+
+/**
+ * A falling power-up capsule dropped by a destroyed alien.
+ *
+ * The capsule only carries its type - what the effect actually does lives with
+ * the player, so adding a second power-up later means a new type and a new
+ * branch in Player.applyPowerUp, not a new entity.
+ */
+SpaceInvaders.PowerUp = class PowerUp extends SpaceInvaders.Entity {
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @param {SpaceInvaders.SpriteManager} spriteManager
+     * @param {'rapidFire'} [type] which effect this capsule grants
+     */
+    constructor(x, y, spriteManager, type = 'rapidFire') {
+        const config = CONFIG.POWERUPS;
+        super(x, y, config.WIDTH, config.HEIGHT);
+        this.type = type;
+        this.speed = config.FALL_SPEED;
+        this.sprite = spriteManager.createSprite('powerupRapidFire');
+        this.animationTimer = 0;
+    }
+
+    update(deltaTime) {
+        this.y += this.speed * deltaTime;
+
+        // Missed capsules are gone for good once they leave the play area
+        if (this.y - this.height / 2 > CONFIG.CANVAS.HEIGHT) {
+            this.active = false;
+        }
+
+        // Pulse between the two frames while falling
+        this.animationTimer += deltaTime * 1000;
+        if (this.animationTimer >= 150) {
+            this.animationTimer = 0;
+            if (this.sprite) {
+                this.sprite.nextFrame();
+            }
+        }
+    }
+
+    render(ctx) {
+        if (!this.sprite) return;
+        ctx.save();
+        // A glow separates the capsule from the alien bullets falling alongside it
+        ctx.shadowColor = CONFIG.POWERUPS.RAPID_FIRE.COLOR;
+        ctx.shadowBlur = 12;
+        this.sprite.render(ctx, this.x, this.y, 2);
         ctx.restore();
     }
 };

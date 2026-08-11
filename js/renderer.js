@@ -67,7 +67,44 @@ SpaceInvaders.Renderer = class Renderer {
         ctx.font = '14px "Press Start 2P", monospace';
         ctx.fillText(`LEVEL ${gameState.level}`, 20, 55);
     }
-    
+
+    /**
+     * Active power-up name and a draining timer bar.
+     *
+     * Sits right-aligned on the same line as LEVEL, which keeps it clear of both
+     * that label and the boss health bar at y=70.
+     * @param {SpaceInvaders.Player} player
+     */
+    renderPowerUpStatus(player) {
+        const ctx = this.ctx;
+        const config = SpaceInvaders.CONFIG.POWERUPS.RAPID_FIRE;
+        const remaining = player.powerUpTime / config.DURATION;
+
+        // Flash the label over the last second as a wear-off warning
+        const expiring = player.powerUpTime < 1000;
+        const visible = !expiring || Math.floor(player.powerUpTime / 150) % 2 === 0;
+
+        const barWidth = 90;
+        const barHeight = 6;
+        const right = this.width - 20;
+
+        if (visible) {
+            ctx.fillStyle = config.COLOR;
+            ctx.font = '14px "Press Start 2P", monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(config.LABEL, right - barWidth - 10, 55);
+        }
+
+        // Timer bar. Always drawn, even mid-flash, so the remaining time stays
+        // readable while the label blinks.
+        ctx.strokeStyle = config.COLOR;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(right - barWidth, 45, barWidth, barHeight);
+        ctx.fillStyle = config.COLOR;
+        ctx.fillRect(right - barWidth, 45, barWidth * Math.max(0, remaining), barHeight);
+    }
+
+
     /**
      * Boss health bar, phase readout, and the entrance warning banner.
      */
@@ -257,6 +294,11 @@ SpaceInvaders.Renderer = class Renderer {
             ctx.fillText('P / ESC - Pause', this.width / 2, 360);
         }
         
+        // Power-up hint, in the capsule's own colour so the connection is obvious
+        // once one actually drops
+        ctx.fillStyle = SpaceInvaders.CONFIG.POWERUPS.RAPID_FIRE.COLOR;
+        ctx.fillText('CATCH ◧ FOR RAPID FIRE', this.width / 2, 390);
+
         // Alien point values
         ctx.fillStyle = '#ff00ff';
         ctx.fillText('▼ = 30 PTS', this.width / 2 - 150, 420);

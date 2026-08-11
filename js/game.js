@@ -28,6 +28,7 @@ SpaceInvaders.Game = class Game {
         this.alienBullets = [];
         this.shields = [];
         this.explosions = [];
+        this.powerUps = [];
         this.ufo = null;
         this.boss = null;
 
@@ -142,7 +143,12 @@ SpaceInvaders.Game = class Game {
         this.playerBullets = [];
         this.alienBullets = [];
         this.explosions = [];
+        this.powerUps = [];
         this.ufo = null;
+        // A capsule caught at the end of a level does not carry into the next one
+        if (this.player) {
+            this.player.clearPowerUp();
+        }
 
         // Reset alien movement
         this.alienDirection = 1;
@@ -236,10 +242,12 @@ SpaceInvaders.Game = class Game {
         // Player firing (only after startup delay)
         if (this.startupDelay <= 0 && this.inputHandler.isFiring() && this.player.canFire()) {
             const CONFIG = SpaceInvaders.CONFIG;
-            // Boss levels grant a larger bullet allowance to keep the fight paced
-            const maxBullets = this.isBossLevel
+            // Boss levels grant a larger bullet allowance to keep the fight paced,
+            // and rapid fire raises it further still
+            const baseAllowance = this.isBossLevel
                 ? CONFIG.BOSS.PLAYER_MAX_BULLETS
                 : CONFIG.BULLETS.PLAYER.MAX_ACTIVE;
+            const maxBullets = this.player.getMaxBullets(baseAllowance);
             if (this.playerBullets.length < maxBullets) {
                 this.playerBullets.push(this.player.fire());
             }
@@ -261,7 +269,10 @@ SpaceInvaders.Game = class Game {
         
         // Update explosions
         this.updateExplosions(deltaTime);
-        
+
+        // Update falling power-up capsules
+        this.updatePowerUps(deltaTime);
+
         // Check collisions
         this.checkCollisions();
         
@@ -413,6 +424,26 @@ SpaceInvaders.Game = class Game {
         }
         this.explosions = this.explosions.filter(e => e.active);
     }
+
+    /**
+     * Roll for a power-up drop at a destroyed alien's position.
+     * @param {number} x
+     * @param {number} y
+     */
+    maybeDropPowerUp(x, y) {
+        const config = SpaceInvaders.CONFIG.POWERUPS;
+        if (this.powerUps.length >= config.MAX_ACTIVE) return;
+        if (Math.random() >= config.DROP_CHANCE) return;
+
+        this.powerUps.push(new SpaceInvaders.PowerUp(x, y, this.spriteManager));
+    }
+
+    updatePowerUps(deltaTime) {
+        for (const powerUp of this.powerUps) {
+            powerUp.update(deltaTime);
+        }
+        this.powerUps = this.powerUps.filter(p => p.active);
+    }
     
     checkCollisions() {
         // Player bullets vs aliens
@@ -438,6 +469,8 @@ SpaceInvaders.Game = class Game {
                             this.alienDirection * this.alienSpeed
                         ));
                         
+                        this.maybeDropPowerUp(alien.x, alien.y);
+
                         // Increase speed
                         const CONFIG = SpaceInvaders.CONFIG;
                         this.alienSpeed += CONFIG.ALIENS.SPEED_INCREASE;
@@ -498,6 +531,20 @@ SpaceInvaders.Game = class Game {
             }
         }
         
+        // Power-up capsules vs player. Capsules pass straight through shields -
+        // there is no capsule/shield check - so a pickup can never be stranded
+        // behind cover the player cannot get to. Collection waits for the respawn
+        // to finish, so a capsule is not silently absorbed while the ship is
+        // blinking and not really back in play yet.
+        if (this.player.respawnTime <= 0) {
+            for (const powerUp of this.powerUps) {
+                if (powerUp.active && powerUp.collidesWith(this.player)) {
+                    powerUp.active = false;
+                    this.player.applyPowerUp(powerUp.type);
+                }
+            }
+        }
+
         // Aliens colliding with shields - destroy the shield
         for (const alien of this.aliens) {
             if (!alien.active) continue;
@@ -597,11 +644,19 @@ SpaceInvaders.Game = class Game {
         this.renderer.renderEntities(this.playerBullets);
         this.renderer.renderEntities(this.alienBullets);
         
+        // Render falling power-up capsules
+        this.renderer.renderEntities(this.powerUps);
+
         // Render explosions
         this.renderer.renderEntities(this.explosions);
-        
+
         // Render HUD
         this.renderer.renderHUD(this.gameState);
+
+        // Active power-up readout, below the standard HUD
+        if (this.player.powerUp) {
+            this.renderer.renderPowerUpStatus(this.player);
+        }
 
         // Boss health bar / warning banner sits above the standard HUD
         if (this.boss && this.boss.active && this.boss.state !== 'dying') {

@@ -85,6 +85,40 @@ SpaceInvaders.CONFIG = {
         }
     },
     
+    // Power-up drops. A destroyed alien may release a capsule that falls toward
+    // the player; catching it grants a temporary effect.
+    POWERUPS: {
+        // The sprite draws 28x14 at scale 2; the box is deliberately taller so
+        // the capsule is forgiving to catch, since missing one loses it for good.
+        WIDTH: 28,
+        HEIGHT: 20,
+        // Slower than an alien bullet (250), giving the player time to line up
+        // the catch and to tell the capsule apart from incoming fire.
+        FALL_SPEED: 110,       // pixels per second
+        // Roughly one capsule per 33 aliens, so a drop is a treat rather than a
+        // routine part of clearing a wave (55 aliens per level).
+        DROP_CHANCE: 0.03,     // chance a destroyed alien releases one
+        // Only one capsule may be falling at a time, so a lucky streak cannot
+        // carpet the screen with pickups.
+        MAX_ACTIVE: 1,
+        // Rapid fire: the base game allows a single player bullet on screen at a
+        // time, so lifting that cap is what makes this pickup feel dramatic.
+        RAPID_FIRE: {
+            DURATION: 4000,    // ms the effect lasts
+            // MAX_ACTIVE, not FIRE_RATE, is what governs the sustained rate: a
+            // bullet needs ~0.89s to clear the screen at 600px/s, so a cap of 2
+            // allows ~2.25 shots/sec no matter how short the interval gets.
+            // Halving the effective rate therefore means halving this number.
+            MAX_ACTIVE: 2,     // player bullets allowed on screen while active
+            // Still well below the cap-imposed limit, so it only shapes the
+            // opening burst - it stops the first two shots leaving as one
+            // instantaneous double-tap.
+            FIRE_RATE: 180,    // ms between shots (base is 200)
+            COLOR: '#ffcc00',
+            LABEL: 'RAPID FIRE'
+        }
+    },
+
     // Shield settings
     SHIELDS: {
         COUNT: 4,
@@ -384,6 +418,35 @@ SpaceInvaders.SPRITES = {
         color: '#ff6600'
     },
     
+    /**
+     * Rapid-fire capsule. Two frames alternate the inner chevrons between hollow
+     * and filled so the pickup pulses while it falls, reading as collectable
+     * rather than as another incoming bullet.
+     */
+    powerupRapidFire: {
+        frames: [
+            [
+                ' ████████████ ',
+                '██          ██',
+                '█  ██    ██  █',
+                '█ ████  ████ █',
+                '█  ██    ██  █',
+                '██          ██',
+                ' ████████████ '
+            ],
+            [
+                ' ████████████ ',
+                '██████████████',
+                '███  ████  ███',
+                '█    ██    ███',
+                '███  ████  ███',
+                '██████████████',
+                ' ████████████ '
+            ]
+        ],
+        color: '#ffcc00'
+    },
+
     shield: {
         frames: [
             [
