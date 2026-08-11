@@ -359,6 +359,347 @@ SpaceInvaders.UFO = class UFO extends SpaceInvaders.Entity {
 };
 
 /**
+ * Boss bullet - travels along an arbitrary vector rather than straight down.
+ * Lives in the alien bullet list so it hits the player and shields like any other.
+ */
+SpaceInvaders.BossBullet = class BossBullet extends SpaceInvaders.Entity {
+    constructor(x, y, vx, vy) {
+        const config = CONFIG.BOSS.BULLET;
+        super(x, y, config.WIDTH, config.HEIGHT);
+        this.vx = vx;
+        this.vy = vy;
+        this.color = config.COLOR;
+        this.isPlayerBullet = false;
+        this.angle = Math.atan2(vy, vx);
+    }
+
+    update(deltaTime) {
+        this.x += this.vx * deltaTime;
+        this.y += this.vy * deltaTime;
+
+        const margin = this.height;
+        if (this.y < -margin || this.y > CONFIG.CANVAS.HEIGHT + margin ||
+            this.x < -margin || this.x > CONFIG.CANVAS.WIDTH + margin) {
+            this.active = false;
+        }
+    }
+
+    render(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        // Point the bolt along its travel direction (sprites face "down" at PI/2)
+        ctx.rotate(this.angle - Math.PI / 2);
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-this.width / 4, -this.height / 2, this.width / 2, this.height / 2);
+        ctx.restore();
+    }
+};
+
+/**
+ * Boss entity - a large multi-hit enemy that replaces the alien grid on boss levels.
+ * Cycles through attack patterns, escalating as its health drops through three phases.
+ */
+SpaceInvaders.Boss = class Boss extends SpaceInvaders.Entity {
+    /**
+     * @param {SpaceInvaders.SpriteManager} spriteManager
+     * @param {number} appearance - 1 for the first boss, 2 for the second, etc.
+     */
+    constructor(spriteManager, appearance = 1) {
+        const config = CONFIG.BOSS;
+        super(CONFIG.CANVAS.WIDTH / 2, -config.HEIGHT, config.WIDTH, config.HEIGHT);
+
+        this.appearance = appearance;
+        this.maxHealth = config.BASE_HEALTH + (appearance - 1) * config.HEALTH_PER_APPEARANCE;
+        this.health = this.maxHealth;
+        this.points = config.POINTS + (appearance - 1) * config.POINTS_PER_APPEARANCE;
+
+        this.sprite = spriteManager.createSprite('boss');
+        this.baseY = config.Y_POSITION;
+        this.direction = Math.random() < 0.5 ? -1 : 1;
+        this.baseSpeed = config.BASE_SPEED + (appearance - 1) * 15;
+
+        this.state = 'entering';   // entering -> active -> dying
+        this.stateTimer = 0;
+        this.animationTimer = 0;
+        this.bobTimer = 0;
+        this.hitFlashTimer = 0;
+
+        this.phase = 1;
+        this.attackIndex = 0;
+        this.attackTimer = config.ATTACKS.SPREAD.COOLDOWN * 0.5; // brief grace after entrance
+        this.pendingShots = [];
+    }
+
+    get healthFraction() {
+        return Math.max(0, this.health / this.maxHealth);
+    }
+
+    /** Whether player bullets can currently damage the boss. */
+    get vulnerable() {
+        return this.state === 'active';
+    }
+
+    get color() {
+        const colors = CONFIG.BOSS.PHASE_COLORS;
+        return colors[Math.min(this.phase, colors.length) - 1];
+    }
+
+    /**
+     * @param {number} deltaTime
+     * @param {object} context - { playerX, playerY, bullets, bulletLimit }
+     */
+    update(deltaTime, context = {}) {
+        const config = CONFIG.BOSS;
+        this.stateTimer += deltaTime * 1000;
+
+        // Animation and hit flash run in every state
+        this.animationTimer += deltaTime * 1000;
+        if (this.animationTimer >= config.ANIMATION_SPEED) {
+            this.animationTimer = 0;
+            if (this.sprite) this.sprite.nextFrame();
+        }
+        if (this.hitFlashTimer > 0) {
+            this.hitFlashTimer -= deltaTime * 1000;
+        }
+
+        switch (this.state) {
+            case 'entering':
+                this.updateEntrance();
+                break;
+            case 'active':
+                this.updateMovement(deltaTime);
+                this.updateAttacks(deltaTime, context);
+                break;
+            case 'dying':
+                // Drift and sink while the death animation plays out
+                this.x += this.direction * this.baseSpeed * 0.3 * deltaTime;
+                this.y += 30 * deltaTime;
+                if (this.stateTimer >= config.DEATH_DURATION) {
+                    this.active = false;
+                }
+                break;
+        }
+    }
+
+    updateEntrance() {
+        const config = CONFIG.BOSS;
+        const progress = Math.min(1, this.stateTimer / config.ENTRANCE_DURATION);
+        // Ease-out so the boss decelerates into its patrol height
+        const eased = 1 - Math.pow(1 - progress, 3);
+        this.y = -config.HEIGHT + (config.Y_POSITION + config.HEIGHT) * eased;
+
+        if (progress >= 1) {
+            this.y = config.Y_POSITION;
+            this.state = 'active';
+            this.stateTimer = 0;
+        }
+    }
+
+    updateMovement(deltaTime) {
+        const config = CONFIG.BOSS;
+        const speed = this.baseSpeed * (1 + (this.phase - 1) * config.PHASE_SPEED_BONUS);
+
+        this.x += this.direction * speed * deltaTime;
+
+        const halfWidth = this.width / 2;
+        const minX = halfWidth + 10;
+        const maxX = CONFIG.CANVAS.WIDTH - halfWidth - 10;
+        if (this.x <= minX) {
+            this.x = minX;
+            this.direction = 1;
+        } else if (this.x >= maxX) {
+            this.x = maxX;
+            this.direction = -1;
+        }
+
+        // Gentle hover
+        this.bobTimer += deltaTime;
+        this.y = this.baseY + Math.sin(this.bobTimer * config.BOB_SPEED) * config.BOB_AMPLITUDE;
+    }
+
+    updateAttacks(deltaTime, context) {
+        const config = CONFIG.BOSS;
+        const bullets = context.bullets;
+        if (!bullets) return;
+        const limit = context.bulletLimit || config.MAX_BULLETS;
+
+        // Release any queued multi-stage shots first.
+        // fire() takes the bullet array as an argument rather than closing over it:
+        // the game reassigns its bullet array every frame when filtering out spent
+        // bullets, so a captured reference would go stale before the shot lands.
+        for (const shot of this.pendingShots) {
+            shot.delay -= deltaTime * 1000;
+        }
+        this.pendingShots = this.pendingShots.filter(shot => {
+            if (shot.delay > 0) return true;
+            if (bullets.length < limit) shot.fire(bullets);
+            return false;
+        });
+
+        this.attackTimer -= deltaTime * 1000;
+        if (this.attackTimer > 0) return;
+        if (bullets.length >= limit) return;
+
+        const rotation = config.PHASE_ATTACKS[Math.min(this.phase, config.PHASE_ATTACKS.length) - 1];
+        const attackName = rotation[this.attackIndex % rotation.length];
+        this.attackIndex++;
+
+        const attack = config.ATTACKS[attackName];
+        this.fireAttack(attackName, attack, context, limit);
+
+        const cooldownScale = Math.max(0.4, 1 - (this.phase - 1) * config.PHASE_COOLDOWN_REDUCTION);
+        this.attackTimer = attack.COOLDOWN * cooldownScale;
+    }
+
+    fireAttack(name, attack, context, limit) {
+        const bullets = context.bullets;
+        const muzzleY = this.y + this.height / 2;
+
+        switch (name) {
+            case 'SPREAD': {
+                // Symmetrical fan aimed downwards from the boss belly
+                const count = attack.BULLETS;
+                const step = count > 1 ? attack.SPREAD_ANGLE / (count - 1) : 0;
+                const start = Math.PI / 2 - attack.SPREAD_ANGLE / 2;
+                for (let i = 0; i < count && bullets.length < limit; i++) {
+                    const angle = start + step * i;
+                    bullets.push(new SpaceInvaders.BossBullet(
+                        this.x,
+                        muzzleY,
+                        Math.cos(angle) * attack.SPEED,
+                        Math.sin(angle) * attack.SPEED
+                    ));
+                }
+                break;
+            }
+
+            case 'AIMED': {
+                // Three bolts tracking the player's current position
+                const targetX = context.playerX != null ? context.playerX : this.x;
+                const targetY = context.playerY != null ? context.playerY : CONFIG.CANVAS.HEIGHT;
+                const baseAngle = Math.atan2(targetY - muzzleY, targetX - this.x);
+                for (const offset of [-attack.FAN_ANGLE, 0, attack.FAN_ANGLE]) {
+                    if (bullets.length >= limit) break;
+                    const angle = baseAngle + offset;
+                    bullets.push(new SpaceInvaders.BossBullet(
+                        this.x,
+                        muzzleY,
+                        Math.cos(angle) * attack.SPEED,
+                        Math.sin(angle) * attack.SPEED
+                    ));
+                }
+                break;
+            }
+
+            case 'VOLLEY': {
+                // Alternating cannon fire, staggered over time
+                const offsets = [-this.width * 0.32, this.width * 0.32];
+                for (let i = 0; i < attack.COUNT; i++) {
+                    const offsetX = offsets[i % offsets.length];
+                    this.pendingShots.push({
+                        delay: i * attack.INTERVAL,
+                        fire: (list) => {
+                            list.push(new SpaceInvaders.BossBullet(
+                                this.x + offsetX,
+                                this.y + this.height / 2,
+                                0,
+                                attack.SPEED
+                            ));
+                        }
+                    });
+                }
+                break;
+            }
+
+            case 'SWEEP': {
+                // A curtain of bullets across the screen with a dodgeable gap
+                const columns = attack.COLUMNS;
+                const spacing = CONFIG.CANVAS.WIDTH / columns;
+                const gapStart = Math.floor(Math.random() * (columns - 1));
+                for (let i = 0; i < columns; i++) {
+                    if (i === gapStart || i === gapStart + 1) continue;
+                    const x = spacing * (i + 0.5);
+                    this.pendingShots.push({
+                        delay: i * 40,
+                        fire: (list) => {
+                            list.push(new SpaceInvaders.BossBullet(
+                                x,
+                                this.y,
+                                0,
+                                attack.SPEED
+                            ));
+                        }
+                    });
+                }
+                break;
+            }
+        }
+    }
+
+    /**
+     * Apply one bullet of damage.
+     * @returns {boolean} true if this hit killed the boss
+     */
+    hitByBullet() {
+        if (!this.vulnerable) return false;
+
+        this.health--;
+        this.hitFlashTimer = CONFIG.BOSS.HIT_FLASH_DURATION;
+
+        // Escalate phase as health drops
+        const fraction = this.healthFraction;
+        const newPhase = fraction > 2 / 3 ? 1 : (fraction > 1 / 3 ? 2 : 3);
+        if (newPhase > this.phase) {
+            this.phase = newPhase;
+            this.attackIndex = 0;
+            this.attackTimer = Math.min(this.attackTimer, 400);
+        }
+
+        if (this.health <= 0) {
+            this.health = 0;
+            this.state = 'dying';
+            this.stateTimer = 0;
+            this.pendingShots = [];
+            return true;
+        }
+        return false;
+    }
+
+    render(ctx) {
+        if (!this.sprite) return;
+
+        const config = CONFIG.BOSS;
+
+        if (this.state === 'dying') {
+            // Flicker out over the death animation
+            const progress = this.stateTimer / config.DEATH_DURATION;
+            if (Math.floor(this.stateTimer / 60) % 2 === 0) return;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, 1 - progress);
+            this.sprite.render(ctx, this.x, this.y, config.SPRITE_SCALE, '#ffaa00');
+            ctx.restore();
+            return;
+        }
+
+        const color = this.hitFlashTimer > 0 ? '#ffffff' : this.color;
+
+        ctx.save();
+        if (this.state === 'entering') {
+            ctx.globalAlpha = Math.min(1, this.stateTimer / (config.ENTRANCE_DURATION * 0.4));
+        }
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = this.phase >= 3 ? 18 : 10;
+        this.sprite.render(ctx, this.x, this.y, config.SPRITE_SCALE, color);
+        ctx.restore();
+    }
+};
+
+/**
  * Explosion effect entity
  */
 SpaceInvaders.Explosion = class Explosion extends SpaceInvaders.Entity {

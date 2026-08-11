@@ -64,6 +64,60 @@ SpaceInvaders.Renderer = class Renderer {
         ctx.fillText(`LEVEL ${gameState.level}`, 20, 55);
     }
     
+    /**
+     * Boss health bar, phase readout, and the entrance warning banner.
+     */
+    renderBossHUD(boss) {
+        const ctx = this.ctx;
+        const CONFIG = SpaceInvaders.CONFIG;
+
+        if (boss.state === 'entering') {
+            // Flashing warning while the boss flies in
+            if (Math.floor(boss.stateTimer / 250) % 2 === 0) {
+                ctx.fillStyle = '#ff0000';
+                ctx.font = '28px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('!! WARNING !!', this.width / 2, this.height / 2 - 20);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '16px "Press Start 2P", monospace';
+                ctx.fillText('BOSS INCOMING', this.width / 2, this.height / 2 + 20);
+            }
+            return;
+        }
+
+        // The bar sits above the boss's patrol band. If you raise BOSS.Y_POSITION or
+        // BOB_AMPLITUDE, keep the boss's top edge (Y_POSITION - BOB_AMPLITUDE - 18)
+        // below barY + barHeight or the sprite will overlap the bar.
+        const barWidth = this.width - 200;
+        const barHeight = 14;
+        const barX = (this.width - barWidth) / 2;
+        const barY = 70;
+        const fraction = boss.healthFraction;
+
+        // Label
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '12px "Press Start 2P", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`BOSS  PHASE ${boss.phase}`, barX, barY - 8);
+
+        ctx.textAlign = 'right';
+        ctx.fillText(`${boss.health}/${boss.maxHealth}`, barX + barWidth, barY - 8);
+
+        // Track
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+
+        // Fill, coloured by phase
+        const phaseColors = CONFIG.BOSS.PHASE_COLORS;
+        ctx.fillStyle = phaseColors[Math.min(boss.phase, phaseColors.length) - 1];
+        ctx.fillRect(barX, barY, barWidth * fraction, barHeight);
+
+        // Outline
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(barX, barY, barWidth, barHeight);
+    }
+
     renderPauseScreen() {
         const ctx = this.ctx;
         
@@ -111,20 +165,25 @@ SpaceInvaders.Renderer = class Renderer {
         ctx.fillText('PRESS SPACE TO CONTINUE', this.width / 2, this.height / 2 + 100);
     }
     
-    renderLevelComplete(level) {
+    renderLevelComplete(level, bossNext = false) {
         const ctx = this.ctx;
-        
+
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, this.width, this.height);
-        
+
         ctx.fillStyle = '#00ff00';
         ctx.font = '36px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
         ctx.fillText(`LEVEL ${level} COMPLETE!`, this.width / 2, this.height / 2);
-        
+
         ctx.fillStyle = '#ffffff';
         ctx.font = '16px "Press Start 2P", monospace';
         ctx.fillText('Get ready...', this.width / 2, this.height / 2 + 50);
+
+        if (bossNext) {
+            ctx.fillStyle = '#ff4444';
+            ctx.fillText('A BOSS APPROACHES', this.width / 2, this.height / 2 + 90);
+        }
     }
     
     renderStartScreen(highScore) {
@@ -165,6 +224,14 @@ SpaceInvaders.Renderer = class Renderer {
         ctx.fillStyle = '#ffff00';
         ctx.fillText('● = 10 PTS', this.width / 2 + 150, 420);
         
+        // Boss teaser
+        const CONFIG = SpaceInvaders.CONFIG;
+        if (CONFIG.BOSS.ENABLED) {
+            ctx.fillStyle = '#ff4444';
+            ctx.font = '14px "Press Start 2P", monospace';
+            ctx.fillText(`BOSS EVERY ${CONFIG.BOSS.LEVEL_INTERVAL} LEVELS`, this.width / 2, 460);
+        }
+
         // Start prompt
         ctx.fillStyle = '#ffffff';
         ctx.font = '18px "Press Start 2P", monospace';

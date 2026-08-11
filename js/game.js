@@ -20,7 +20,8 @@ SpaceInvaders.Game = class Game {
         this.shields = [];
         this.explosions = [];
         this.ufo = null;
-        
+        this.boss = null;
+
         this.alienDirection = 1;
         this.alienSpeed = SpaceInvaders.CONFIG.ALIENS.BASE_SPEED;
         this.lastAlienFireTime = 0;
@@ -51,31 +52,35 @@ SpaceInvaders.Game = class Game {
     
     initLevel() {
         const CONFIG = SpaceInvaders.CONFIG;
-        
+
         // Create player
         this.player = new SpaceInvaders.Player(this.spriteManager);
         this.player.lives = this.gameState.lives;
-        
-        // Create aliens
+
+        this.isBossLevel = this.gameState.isBossLevel();
+
+        // Create aliens (boss levels replace the grid with a single boss)
         this.aliens = [];
-        const alienConfig = CONFIG.ALIENS;
-        for (let row = 0; row < alienConfig.ROWS; row++) {
-            for (let col = 0; col < alienConfig.COLS; col++) {
-                const type = CONFIG.ALIEN_TYPES[row];
-                const x = alienConfig.START_X + col * (alienConfig.WIDTH + alienConfig.PADDING_X);
-                const y = alienConfig.START_Y + row * (alienConfig.HEIGHT + alienConfig.PADDING_Y);
-                
-                // Add shields to some aliens in level 2+
-                let hasShield = false;
-                if (this.gameState.level >= 2) {
-                    // 20% chance for an alien to have a shield in level 2+
-                    hasShield = Math.random() < 0.2;
+        if (!this.isBossLevel) {
+            const alienConfig = CONFIG.ALIENS;
+            for (let row = 0; row < alienConfig.ROWS; row++) {
+                for (let col = 0; col < alienConfig.COLS; col++) {
+                    const type = CONFIG.ALIEN_TYPES[row];
+                    const x = alienConfig.START_X + col * (alienConfig.WIDTH + alienConfig.PADDING_X);
+                    const y = alienConfig.START_Y + row * (alienConfig.HEIGHT + alienConfig.PADDING_Y);
+
+                    // Add shields to some aliens in level 2+
+                    let hasShield = false;
+                    if (this.gameState.level >= 2) {
+                        // 20% chance for an alien to have a shield in level 2+
+                        hasShield = Math.random() < 0.2;
+                    }
+
+                    this.aliens.push(new SpaceInvaders.Alien(x, y, type, this.spriteManager, hasShield));
                 }
-                
-                this.aliens.push(new SpaceInvaders.Alien(x, y, type, this.spriteManager, hasShield));
             }
         }
-        
+
         // Create shields
         this.shields = [];
         const shieldConfig = CONFIG.SHIELDS;
@@ -86,12 +91,17 @@ SpaceInvaders.Game = class Game {
             this.shields.push(new SpaceInvaders.Shield(x, shieldConfig.Y_POSITION, this.spriteManager));
         }
         
+        // Create boss on boss levels
+        this.boss = this.isBossLevel
+            ? new SpaceInvaders.Boss(this.spriteManager, this.gameState.bossAppearance())
+            : null;
+
         // Reset bullets and effects
         this.playerBullets = [];
         this.alienBullets = [];
         this.explosions = [];
         this.ufo = null;
-        
+
         // Reset alien movement
         this.alienDirection = 1;
         this.alienSpeed = CONFIG.ALIENS.BASE_SPEED + (this.gameState.level - 1) * 10;
@@ -178,17 +188,26 @@ SpaceInvaders.Game = class Game {
         // Player firing (only after startup delay)
         if (this.startupDelay <= 0 && this.inputHandler.isFiring() && this.player.canFire()) {
             const CONFIG = SpaceInvaders.CONFIG;
-            if (this.playerBullets.length < CONFIG.BULLETS.PLAYER.MAX_ACTIVE) {
+            // Boss levels grant a larger bullet allowance to keep the fight paced
+            const maxBullets = this.isBossLevel
+                ? CONFIG.BOSS.PLAYER_MAX_BULLETS
+                : CONFIG.BULLETS.PLAYER.MAX_ACTIVE;
+            if (this.playerBullets.length < maxBullets) {
                 this.playerBullets.push(this.player.fire());
             }
         }
-        
+
         // Update aliens
         this.updateAliens(deltaTime);
-        
-        // Update UFO
-        this.updateUFO(deltaTime);
-        
+
+        // Update boss
+        this.updateBoss(deltaTime);
+
+        // Update UFO (boss levels have no mystery ship)
+        if (!this.isBossLevel) {
+            this.updateUFO(deltaTime);
+        }
+
         // Update bullets
         this.updateBullets(deltaTime);
         
@@ -274,6 +293,36 @@ SpaceInvaders.Game = class Game {
         }
     }
     
+    updateBoss(deltaTime) {
+        if (!this.boss) return;
+
+        const CONFIG = SpaceInvaders.CONFIG;
+        const wasDying = this.boss.state === 'dying';
+
+        this.boss.update(deltaTime, {
+            playerX: this.player.x,
+            playerY: this.player.y,
+            bullets: this.alienBullets,
+            bulletLimit: CONFIG.BOSS.MAX_BULLETS
+        });
+
+        // Scatter explosions across the hull while the boss dies
+        if (this.boss.state === 'dying' && Math.random() < 0.35) {
+            const offsetX = (Math.random() - 0.5) * this.boss.width;
+            const offsetY = (Math.random() - 0.5) * this.boss.height;
+            this.explosions.push(new SpaceInvaders.Explosion(
+                this.boss.x + offsetX,
+                this.boss.y + offsetY,
+                this.spriteManager
+            ));
+        }
+
+        // Death animation finished - clear the boss so the level can complete
+        if (wasDying && !this.boss.active) {
+            this.boss = null;
+        }
+    }
+
     updateUFO(deltaTime) {
         const CONFIG = SpaceInvaders.CONFIG;
         
@@ -351,6 +400,20 @@ SpaceInvaders.Game = class Game {
                 }
             }
             
+            // Player bullets vs boss
+            if (bullet.active && this.boss && this.boss.vulnerable && bullet.collidesWith(this.boss)) {
+                bullet.active = false;
+                const killed = this.boss.hitByBullet();
+                this.explosions.push(new SpaceInvaders.Explosion(
+                    bullet.x,
+                    this.boss.y + this.boss.height / 2,
+                    this.spriteManager
+                ));
+                if (killed) {
+                    this.gameState.addScore(this.boss.points);
+                }
+            }
+
             // Player bullets vs UFO
             if (this.ufo && this.ufo.active && bullet.collidesWith(this.ufo)) {
                 bullet.active = false;
@@ -414,8 +477,16 @@ SpaceInvaders.Game = class Game {
     }
     
     checkGameConditions() {
+        // Boss levels end when the boss is destroyed and its death animation finishes
+        if (this.isBossLevel) {
+            if (!this.boss) {
+                this.gameState.completeLevel();
+            }
+            return;
+        }
+
         const activeAliens = this.aliens.filter(a => a.active);
-        
+
         if (activeAliens.length === 0) {
             this.gameState.completeLevel();
         }
@@ -435,7 +506,10 @@ SpaceInvaders.Game = class Game {
                 if (this.gameState.state === 'paused') {
                     this.renderer.renderPauseScreen();
                 } else if (this.gameState.state === 'levelComplete') {
-                    this.renderer.renderLevelComplete(this.gameState.level);
+                    const CONFIG = SpaceInvaders.CONFIG;
+                    const bossNext = CONFIG.BOSS.ENABLED &&
+                        (this.gameState.level + 1) % CONFIG.BOSS.LEVEL_INTERVAL === 0;
+                    this.renderer.renderLevelComplete(this.gameState.level, bossNext);
                 }
                 break;
             case 'gameOver':
@@ -458,7 +532,12 @@ SpaceInvaders.Game = class Game {
         
         // Render aliens
         this.renderer.renderEntities(this.aliens.filter(a => a.active));
-        
+
+        // Render boss
+        if (this.boss && this.boss.active) {
+            this.renderer.renderEntity(this.boss);
+        }
+
         // Render UFO
         if (this.ufo && this.ufo.active) {
             this.renderer.renderEntity(this.ufo);
@@ -473,5 +552,10 @@ SpaceInvaders.Game = class Game {
         
         // Render HUD
         this.renderer.renderHUD(this.gameState);
+
+        // Boss health bar / warning banner sits above the standard HUD
+        if (this.boss && this.boss.active && this.boss.state !== 'dying') {
+            this.renderer.renderBossHUD(this.boss);
+        }
     }
 };

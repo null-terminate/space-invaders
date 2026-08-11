@@ -106,6 +106,49 @@ SpaceInvaders.CONFIG = {
         SPAWN_CHANCE: 0.5              // 50% chance to spawn
     },
     
+    // Boss settings
+    BOSS: {
+        ENABLED: true,
+        LEVEL_INTERVAL: 3,             // boss appears on every Nth level
+        WIDTH: 104,                    // collision width (sprite renders 108x36 at scale 3)
+        HEIGHT: 32,                    // collision height
+        SPRITE_SCALE: 3,
+        Y_POSITION: 145,               // patrol height (keeps the sprite clear of the health bar)
+        BASE_HEALTH: 24,               // hits to kill on first appearance
+        HEALTH_PER_APPEARANCE: 8,      // extra hits per subsequent boss
+        BASE_SPEED: 90,                // pixels per second
+        POINTS: 1000,
+        POINTS_PER_APPEARANCE: 500,
+        BOB_AMPLITUDE: 18,             // vertical hover distance
+        BOB_SPEED: 1.2,                // hover cycles per second (radians/s)
+        ANIMATION_SPEED: 400,          // ms between animation frames
+        HIT_FLASH_DURATION: 90,        // ms of white flash when hit
+        ENTRANCE_DURATION: 1800,       // ms fly-in before the boss can attack
+        DEATH_DURATION: 1400,          // ms of death animation
+        MAX_BULLETS: 18,               // cap on simultaneous boss bullets
+        PLAYER_MAX_BULLETS: 2,         // player bullet allowance during boss levels
+        PHASE_SPEED_BONUS: 0.35,       // speed multiplier added per phase past the first
+        PHASE_COOLDOWN_REDUCTION: 0.18,// attack cooldown cut per phase past the first
+        PHASE_COLORS: ['#ff4444', '#ff8800', '#ff00ff'],
+        // Attack rotation per phase (1 = full health, 3 = near death)
+        PHASE_ATTACKS: [
+            ['SPREAD', 'AIMED', 'VOLLEY'],
+            ['AIMED', 'SPREAD', 'SWEEP', 'VOLLEY'],
+            ['SWEEP', 'AIMED', 'SPREAD', 'VOLLEY', 'AIMED']
+        ],
+        ATTACKS: {
+            SPREAD: { COOLDOWN: 2200, BULLETS: 5, SPREAD_ANGLE: 1.0, SPEED: 220 },
+            AIMED:  { COOLDOWN: 1500, SPEED: 320, FAN_ANGLE: 0.14 },
+            VOLLEY: { COOLDOWN: 2600, COUNT: 4, INTERVAL: 130, SPEED: 300 },
+            SWEEP:  { COOLDOWN: 4200, COLUMNS: 12, SPEED: 190 }
+        },
+        BULLET: {
+            WIDTH: 6,
+            HEIGHT: 14,
+            COLOR: '#ff66ff'
+        }
+    },
+
     // Game settings
     GAME: {
         TARGET_FPS: 60,
@@ -242,13 +285,49 @@ SpaceInvaders.SPRITES = {
                 '  ██████████████████  ',
                 ' ██ ██ ██ ██ ██ ██ ██ ',
                 '██████████████████████',
-                '    ████    ████      ',
-                '      ██    ██        '
+                '    ████      ████    ',
+                '      ██      ██      '
             ]
         ],
         color: '#ff0000'
     },
     
+    boss: {
+        frames: [
+            // Frame 1
+            [
+                '            ████████████            ',
+                '         ██████████████████         ',
+                '      ████████████████████████      ',
+                '    ████████████████████████████    ',
+                '  ████████████████████████████████  ',
+                ' ███████    ████████████    ███████ ',
+                '████████████████████████████████████',
+                '██  ██  ██  ██  ██  ██  ██  ██  ██  ',
+                '   ██████████████████████████████   ',
+                '      ████████        ████████      ',
+                '        ████            ████        ',
+                '         ████          ████         '
+            ],
+            // Frame 2
+            [
+                '            ████████████            ',
+                '         ██████████████████         ',
+                '      ████████████████████████      ',
+                '    ████████████████████████████    ',
+                '  ████████████████████████████████  ',
+                ' ███████    ████████████    ███████ ',
+                '████████████████████████████████████',
+                '  ██  ██  ██  ██  ██  ██  ██  ██  ██',
+                '   ██████████████████████████████   ',
+                '      ████████        ████████      ',
+                '       ██████          ██████       ',
+                '          ██            ██          '
+            ]
+        ],
+        color: '#ff4444'
+    },
+
     explosion: {
         frames: [
             [

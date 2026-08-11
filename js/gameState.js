@@ -48,6 +48,18 @@ SpaceInvaders.GameState = class GameState {
     nextLevel() {
         this.level++;
     }
+
+    /** True when the current level is a boss encounter instead of an alien grid. */
+    isBossLevel() {
+        const CONFIG = SpaceInvaders.CONFIG;
+        return CONFIG.BOSS.ENABLED && this.level % CONFIG.BOSS.LEVEL_INTERVAL === 0;
+    }
+
+    /** How many bosses have been faced by this level, counting the current one (1-based). */
+    bossAppearance() {
+        const CONFIG = SpaceInvaders.CONFIG;
+        return Math.floor(this.level / CONFIG.BOSS.LEVEL_INTERVAL);
+    }
     
     reset() {
         const CONFIG = SpaceInvaders.CONFIG;
